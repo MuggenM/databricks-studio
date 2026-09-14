@@ -1,0 +1,10 @@
+localspark_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '/workspace/warehouse/dbt_analytics.duckdb'
+      extensions:
+        - httpfs
+        - delta
+      threads: 2

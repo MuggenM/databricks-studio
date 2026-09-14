@@ -1,0 +1,130 @@
+{
+  "chats": [
+    {
+      "id": "genie_top_earning_depts",
+      "title": "Top Earning Departments Analysis",
+      "created_at": "2026-09-14 10:00:00",
+      "updated_at": "2026-09-14 10:05:00",
+      "messages": [
+        {
+          "id": "msg_prompt_1_user",
+          "role": "user",
+          "content": "Show me the top 3 highest earning departments with employee counts",
+          "created_at": "2026-09-14 10:00:00"
+        },
+        {
+          "id": "msg_prompt_1_assistant",
+          "role": "assistant",
+          "content": "This query groups employees by their departments and calculates the number of employees in each department as well as total payroll earnings. It orders results by total earnings in descending order to show the top 3 departments.",
+          "sql": "SELECT department, COUNT(name) AS employee_count, SUM(salary) AS total_earnings FROM silver_employees GROUP BY department ORDER BY total_earnings DESC LIMIT 3;",
+          "explanation": "Calculates department employee count and total payroll earnings from silver_employees, ranked by total earnings.",
+          "provider": "ollama",
+          "model": "qwen2.5-coder:latest",
+          "gen_duration_sec": 4.2,
+          "query_result": {
+            "success": true,
+            "columns": [
+              {
+                "name": "department",
+                "type": "VARCHAR"
+              },
+              {
+                "name": "employee_count",
+                "type": "BIGINT"
+              },
+              {
+                "name": "total_earnings",
+                "type": "HUGEINT"
+              }
+            ],
+            "rows": [
+              {
+                "department": "Engineering",
+                "employee_count": 3,
+                "total_earnings": 355000
+              },
+              {
+                "department": "Finance",
+                "employee_count": 2,
+                "total_earnings": 195000
+              }
+            ],
+            "row_count": 2,
+            "duration_ms": 3.12,
+            "error": null
+          },
+          "suggested_visualization": "bar",
+          "x_axis": "department",
+          "y_axis": "total_earnings",
+          "created_at": "2026-09-14 10:00:04"
+        }
+      ]
+    },
+    {
+      "id": "genie_dept_payroll_breakdown",
+      "title": "Department Payroll Breakdown",
+      "created_at": "2026-09-14 10:10:00",
+      "updated_at": "2026-09-14 10:15:00",
+      "messages": [
+        {
+          "id": "msg_prompt_2_user",
+          "role": "user",
+          "content": "What is the average salary and headcount by department?",
+          "created_at": "2026-09-14 10:10:00"
+        },
+        {
+          "id": "msg_prompt_2_assistant",
+          "role": "assistant",
+          "content": "This query calculates the average salary, total headcount, and annual payroll for each department in the lakehouse.",
+          "sql": "SELECT department, COUNT(*) AS employee_count, ROUND(AVG(salary), 2) AS avg_salary, ROUND(SUM(salary), 2) AS total_payroll FROM silver_employees GROUP BY department ORDER BY avg_salary DESC;",
+          "explanation": "Summarizes headcount, average salary, and total payroll grouped by department.",
+          "provider": "ollama",
+          "model": "qwen2.5-coder:latest",
+          "gen_duration_sec": 3.8,
+          "query_result": {
+            "success": true,
+            "columns": [
+              {
+                "name": "department",
+                "type": "VARCHAR"
+              },
+              {
+                "name": "employee_count",
+                "type": "BIGINT"
+              },
+              {
+                "name": "avg_salary",
+                "type": "DOUBLE"
+              },
+              {
+                "name": "total_payroll",
+                "type": "DOUBLE"
+              }
+            ],
+            "rows": [
+              {
+                "department": "Engineering",
+                "employee_count": 3,
+                "avg_salary": 118333.33,
+                "total_payroll": 355000.0
+              },
+              {
+                "department": "Finance",
+                "employee_count": 2,
+                "avg_salary": 97500.0,
+                "total_payroll": 195000.0
+              }
+            ],
+            "row_count": 2,
+            "duration_ms": 2.85,
+            "error": null
+          },
+          "suggested_visualization": "table",
+          "x_axis": "department",
+          "y_axis": "avg_salary",
+          "created_at": "2026-09-14 10:10:04"
+        }
+      ]
+    }
+  ]
+}

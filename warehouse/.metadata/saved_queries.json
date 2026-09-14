@@ -1,0 +1,77 @@
+{
+  "queries": [
+    {
+      "id": "sq_dept_salary_distribution",
+      "name": "Department Salary & Headcount",
+      "description": "Aggregates total employee count, annual salary sum, and average salary grouped by department. (Verified warehouse.dbo)",
+      "query_text": "SELECT \n    department,\n    COUNT(*) AS total_employees,\n    ROUND(AVG(salary), 2) AS avg_salary,\n    ROUND(SUM(salary), 2) AS total_payroll\nFROM warehouse.dbo.silver_employees\nGROUP BY department\nORDER BY avg_salary DESC;",
+      "warehouse_id": "wh_starter",
+      "catalog": "warehouse",
+      "schema_name": "dbo",
+      "tags": [
+        "HR",
+        "Payroll",
+        "Analytics"
+      ],
+      "created_at": "2026-09-12 11:43:48",
+      "updated_at": "2026-09-14 03:34:35",
+      "last_run_at": "2026-09-13 21:56:52",
+      "run_count": 2
+    },
+    {
+      "id": "sq_nyse_market_cap_leaders",
+      "name": "NYSE Top Market Cap Tickers by Sector",
+      "description": "Ranks top publicly traded companies on NYSE by sector and calculates market capitalization totals.",
+      "query_text": "SELECT \n    sector,\n    COUNT(ticker) AS num_companies,\n    ROUND(SUM(market_cap_b), 2) AS total_market_cap_b,\n    ROUND(AVG(market_cap_b), 2) AS avg_market_cap_b\nFROM warehouse.dbo.nyse_tickers\nGROUP BY sector\nORDER BY total_market_cap_b DESC;",
+      "warehouse_id": "wh_starter",
+      "catalog": "warehouse",
+      "schema_name": "dbo",
+      "tags": [
+        "Finance",
+        "Equities",
+        "Executive",
+        "MarketCapLeaders"
+      ],
+      "created_at": "2026-09-12 11:43:48",
+      "updated_at": "2026-09-14 03:34:37",
+      "last_run_at": "2026-09-14 02:53:07",
+      "run_count": 13
+    },
+    {
+      "id": "sq_inventory_reorder_valuation",
+      "name": "Product Inventory Valuation & Low Stock Warning",
+      "description": "Computes total inventory asset value per category and highlights SKUs requiring immediate reordering.",
+      "query_text": "SELECT \n    category,\n    product_name,\n    stock_qty,\n    price,\n    ROUND(stock_qty * price, 2) AS inventory_value,\n    CASE \n        WHEN stock_qty < 25 THEN 'CRITICAL: Reorder Now'\n        WHEN stock_qty < 50 THEN 'WARNING: Low Stock'\n        ELSE 'HEALTHY'\n    END AS stock_health\nFROM warehouse.dbo.dim_products\nORDER BY stock_qty ASC;",
+      "warehouse_id": "wh_starter",
+      "catalog": "warehouse",
+      "schema_name": "dbo",
+      "tags": [
+        "Ops",
+        "Inventory",
+        "Supply Chain"
+      ],
+      "created_at": "2026-09-12 11:43:48",
+      "updated_at": "2026-09-14 05:32:00",
+      "last_run_at": "2026-09-13 21:58:45",
+      "run_count": 2
+    },
+    {
+      "id": "sq_gold_kpi_hourly_throughput",
+      "name": "Gold Telemetry Hourly KPI Trends",
+      "description": "Analyzes device sensor metrics, average temperatures, and event volumes from the Gold analytical layer.",
+      "query_text": "SELECT \n    device_id,\n    ROUND(avg_temp, 2) AS avg_temperature,\n    event_count,\n    window_start\nFROM warehouse.dbo.gold_telemetry_kpis\nORDER BY window_start DESC\nLIMIT 50;",
+      "warehouse_id": "wh_starter",
+      "catalog": "warehouse",
+      "schema_name": "dbo",
+      "tags": [
+        "IoT",
+        "KPIs",
+        "Gold Layer"
+      ],
+      "created_at": "2026-09-12 11:43:48",
+      "updated_at": "2026-09-14 05:32:00",
+      "last_run_at": null,
+      "run_count": 0
+    }
+  ]
+}
