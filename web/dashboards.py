@@ -26,6 +26,8 @@ DEFAULT_DASHBOARDS = [
         "created_at": "2026-09-12 02:30:00",
         "auto_refresh_enabled": False,
         "auto_refresh_interval": 30,
+        "date_range_enabled": True,
+        "date_column": "hire_date",
         "filters": [
             {
                 "key": "department",
@@ -50,6 +52,12 @@ DEFAULT_DASHBOARDS = [
                 "dimension": "category",
                 "table": "dim_products",
                 "default": "ALL"
+            },
+            {
+                "key": "date_range",
+                "label": "Date Range",
+                "type": "daterange",
+                "default": "all_time"
             }
         ],
         "widgets": [
@@ -57,7 +65,7 @@ DEFAULT_DASHBOARDS = [
                 "id": "w_kpi_1",
                 "title": "Total Workforce",
                 "type": "kpi",
-                "query": "SELECT COUNT(*) as value FROM silver_employees WHERE (:department IS NULL OR department = :department)",
+                "query": "SELECT COUNT(*) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "unit": "employees",
                 "width": "col-span-1"
             },
@@ -65,7 +73,7 @@ DEFAULT_DASHBOARDS = [
                 "id": "w_kpi_2",
                 "title": "Annual Payroll",
                 "type": "kpi",
-                "query": "SELECT SUM(salary) as value FROM silver_employees WHERE (:department IS NULL OR department = :department)",
+                "query": "SELECT SUM(salary) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "unit": "$",
                 "width": "col-span-1"
             },
@@ -90,7 +98,7 @@ DEFAULT_DASHBOARDS = [
                 "title": "Average Salary by Department",
                 "type": "bar",
                 "filter_dimension": "department",
-                "query": "SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees WHERE (:department IS NULL OR department = :department) GROUP BY department ORDER BY avg_salary DESC",
+                "query": "SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date) GROUP BY department ORDER BY avg_salary DESC",
                 "x_col": "department",
                 "y_col": "avg_salary",
                 "unit": "$",
@@ -198,7 +206,7 @@ DEFAULT_DASHBOARDS = [
                 "id": "w_scatter_1",
                 "title": "Salary vs Bonus Analysis",
                 "type": "scatter",
-                "query": "SELECT salary, bonus_estimate FROM silver_employees WHERE salary IS NOT NULL AND bonus_estimate IS NOT NULL",
+                "query": "SELECT salary, bonus_estimate FROM silver_employees WHERE salary IS NOT NULL AND bonus_estimate IS NOT NULL AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "x_col": "salary",
                 "y_col": "bonus_estimate",
                 "unit": "$",

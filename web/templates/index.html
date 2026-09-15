@@ -4410,7 +4410,16 @@
               <button @click="setDatePreset('all')" :class="datePreset === 'all' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-2 py-0.5 rounded text-[11px] transition">All Time</button>
               <button @click="setDatePreset('7d')" :class="datePreset === '7d' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-2 py-0.5 rounded text-[11px] transition">Last 7D</button>
               <button @click="setDatePreset('30d')" :class="datePreset === '30d' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-2 py-0.5 rounded text-[11px] transition">Last 30D</button>
+              <button @click="setDatePreset('90d')" :class="datePreset === '90d' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-2 py-0.5 rounded text-[11px] transition">Last 90D</button>
               <button @click="setDatePreset('ytd')" :class="datePreset === 'ytd' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-2 py-0.5 rounded text-[11px] transition">YTD</button>
+            </div>
+
+            <!-- Custom Date Range Picker -->
+            <div class="flex items-center space-x-1.5 bg-slate-50 dark:bg-dbx-panel border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 shadow-xs">
+              <i class="ph ph-calendar text-indigo-600 dark:text-indigo-400 text-sm"></i>
+              <input type="date" x-model="dashboardFilters.start_date" @change="datePreset = 'custom'; applyDashboardFilters()" placeholder="Start Date" class="bg-transparent text-slate-900 dark:text-white text-xs focus:outline-none border-none" style="width: 110px;">
+              <span class="text-slate-400">to</span>
+              <input type="date" x-model="dashboardFilters.end_date" @change="datePreset = 'custom'; applyDashboardFilters()" placeholder="End Date" class="bg-transparent text-slate-900 dark:text-white text-xs focus:outline-none border-none" style="width: 110px;">
             </div>
           </div>
 
@@ -14627,6 +14636,37 @@
           if (this.activeCrossFilter) return true;
           if (this.datePreset !== 'all') return true;
           return Object.values(this.dashboardFilters).some(v => v && v !== 'ALL');
+        },
+
+        setDatePreset(preset) {
+          this.datePreset = preset;
+          const today = new Date();
+          let startDate = '';
+          let endDate = today.toISOString().split('T')[0];
+
+          switch(preset) {
+            case '7d':
+              startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              break;
+            case '30d':
+              startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              break;
+            case '90d':
+              startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              break;
+            case 'ytd':
+              startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+              break;
+            case 'all':
+            default:
+              startDate = '';
+              endDate = '';
+              break;
+          }
+
+          this.dashboardFilters.start_date = startDate;
+          this.dashboardFilters.end_date = endDate;
+          this.applyDashboardFilters();
         },
 
         async fetchDashboard(id) {
