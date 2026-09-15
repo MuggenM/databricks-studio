@@ -2209,6 +2209,68 @@ async def get_theme(theme_id: str):
         raise HTTPException(status_code=404, detail="Theme not found")
     return {"success": True, "theme": theme}
 
+@app.get("/api/folders")
+async def list_folders(parent_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """List dashboard folders."""
+    from web.dashboard_folders import list_folders as list_folders_func
+    folders = list_folders_func(parent_id)
+    return {"success": True, "folders": folders}
+
+@app.get("/api/folders/tree")
+async def get_folder_tree(current_user: dict = Depends(get_current_user)):
+    """Get folder hierarchy tree."""
+    from web.dashboard_folders import get_folder_tree
+    tree = get_folder_tree()
+    return {"success": True, "tree": tree}
+
+@app.post("/api/folders")
+async def create_folder(name: str, parent_id: str = "folder_root", icon: str = "folder", current_user: dict = Depends(get_current_user)):
+    """Create a new folder."""
+    from web.dashboard_folders import create_folder as create_folder_func
+    folder_id = create_folder_func(name, parent_id, icon, current_user["username"])
+    return {"success": True, "folder_id": folder_id}
+
+@app.post("/api/dashboards/{dashboard_id}/move")
+async def move_dashboard(dashboard_id: str, folder_id: str, current_user: dict = Depends(get_current_user)):
+    """Move dashboard to a folder."""
+    from web.dashboard_folders import move_dashboard_to_folder
+    success = move_dashboard_to_folder(dashboard_id, folder_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return {"success": True}
+
+@app.get("/api/widgets/{widget_id}/comments")
+async def list_widget_comments(widget_id: str, current_user: dict = Depends(get_current_user)):
+    """List comments on a widget."""
+    from web.widget_comments import list_comments
+    comments = list_comments(widget_id)
+    return {"success": True, "comments": comments}
+
+@app.post("/api/widgets/{widget_id}/comments")
+async def add_widget_comment(widget_id: str, text: str, current_user: dict = Depends(get_current_user)):
+    """Add a comment to a widget."""
+    from web.widget_comments import add_comment
+    comment_id = add_comment(widget_id, text, current_user["username"])
+    return {"success": True, "comment_id": comment_id}
+
+@app.put("/api/widgets/{widget_id}/comments/{comment_id}")
+async def update_widget_comment(widget_id: str, comment_id: str, text: str, current_user: dict = Depends(get_current_user)):
+    """Update a comment."""
+    from web.widget_comments import update_comment
+    success = update_comment(widget_id, comment_id, text, current_user["username"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"success": True}
+
+@app.delete("/api/widgets/{widget_id}/comments/{comment_id}")
+async def delete_widget_comment(widget_id: str, comment_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a comment."""
+    from web.widget_comments import delete_comment
+    success = delete_comment(widget_id, comment_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"success": True}
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 
