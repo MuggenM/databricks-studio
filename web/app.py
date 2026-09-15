@@ -2052,6 +2052,58 @@ async def get_cache_stats(current_user: dict = Depends(get_current_user)):
         "default_ttl_seconds": CACHE_TTL_SECONDS
     }
 
+@app.post("/api/dashboards/{dashboard_id}/share")
+async def create_share_link(dashboard_id: str, expires_in_days: int = 30, current_user: dict = Depends(get_current_user)):
+    """Create a shareable link for a dashboard."""
+    from web.dashboards import create_dashboard_share, load_dashboards_store
+
+    # Verify dashboard exists
+    dashboards = load_dashboards_store()
+    dashboard = next((d for d in dashboards if d["id"] == dashboard_id), None)
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    share_token = create_dashboard_share(dashboard_id, current_user["username"], expires_in_days)
+
+    return {
+        "success": True,
+        "share_token": share_token,
+        "share_url": f"/share/{share_token}",
+        "expires_in_days": expires_in_days
+    }
+
+@app.get("/api/dashboards/shares")
+async def list_shares(dashboard_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """List all dashboard shares."""
+    from web.dashboards import list_dashboard_shares
+    shares = list_dashboard_shares(dashboard_id)
+    return {"success": True, "shares": shares}
+
+@app.delete("/api/dashboards/share/{share_token}")
+async def revoke_share(share_token: str, current_user: dict = Depends(get_current_user)):
+    """Revoke a dashboard share."""
+    from web.dashboards import revoke_dashboard_share
+    success = revoke_dashboard_share(share_token)
+    if not success:
+        raise HTTPException(status_code=404, detail="Share token not found")
+    return {"success": True, "message": "Share revoked"}
+
+@app.get("/share/{share_token}")
+async def view_shared_dashboard(share_token: str):
+    """View a shared dashboard (no auth required)."""
+    from web.dashboards import get_dashboard_by_share_token
+    dashboard = get_dashboard_by_share_token(share_token)
+
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Share link not found or expired")
+
+    # Return the main index page with share token in URL
+    # The frontend will detect the share token and load the dashboard
+    with open("/workspace/web/templates/index.html", "r") as f:
+        html_content = f.read()
+
+    return HTMLResponse(content=html_content)
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 

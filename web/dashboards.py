@@ -22,7 +22,11 @@ if not os.path.exists(WAREHOUSE_DIR):
         WAREHOUSE_DIR = local_alt
 METADATA_DIR = os.path.join(WAREHOUSE_DIR, ".metadata")
 DASHBOARDS_FILE = os.path.join(METADATA_DIR, "dashboards.json")
+DASHBOARD_SHARES_FILE = os.path.join(METADATA_DIR, "dashboard_shares.json")
 os.makedirs(METADATA_DIR, exist_ok=True)
+
+# Dashboard shares: {share_token: {dashboard_id, created_at, created_by, expires_at, access_count}}
+DASHBOARD_SHARES = {}
 
 DEFAULT_DASHBOARDS = [
     {
@@ -442,6 +446,103 @@ def clear_query_cache():
     """Clear all cached query results."""
     QUERY_CACHE.clear()
     logger.info("Query cache cleared")
+
+def load_dashboard_shares() -> Dict[str, Any]:
+    """Load dashboard shares from file."""
+    global DASHBOARD_SHARES
+    if os.path.exists(DASHBOARD_SHARES_FILE):
+        try:
+            with open(DASHBOARD_SHARES_FILE, "r") as f:
+                DASHBOARD_SHARES = json.load(f)
+        except Exception as e:
+            logger.warning(f"Error loading dashboard shares: {e}")
+            DASHBOARD_SHARES = {}
+    return DASHBOARD_SHARES
+
+def save_dashboard_shares():
+    """Save dashboard shares to file."""
+    try:
+        with open(DASHBOARD_SHARES_FILE, "w") as f:
+            json.dump(DASHBOARD_SHARES, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving dashboard shares: {e}")
+
+def create_dashboard_share(dashboard_id: str, created_by: str, expires_in_days: int = 30) -> str:
+    """Create a shareable link token for a dashboard."""
+    load_dashboard_shares()
+
+    # Generate unique share token
+    share_token = hashlib.md5(f"{dashboard_id}{time.time()}{uuid.uuid4()}".encode()).hexdigest()[:12]
+
+    created_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + expires_in_days * 86400))
+
+    DASHBOARD_SHARES[share_token] = {
+        "dashboard_id": dashboard_id,
+        "created_at": created_at,
+        "created_by": created_by,
+        "expires_at": expires_at,
+        "expires_in_days": expires_in_days,
+        "access_count": 0
+    }
+
+    save_dashboard_shares()
+    logger.info(f"Created share token {share_token} for dashboard {dashboard_id}")
+    return share_token
+
+def get_dashboard_by_share_token(share_token: str) -> Optional[Dict[str, Any]]:
+    """Get dashboard by share token if valid."""
+    load_dashboard_shares()
+
+    if share_token not in DASHBOARD_SHARES:
+        return None
+
+    share = DASHBOARD_SHARES[share_token]
+
+    # Check if expired
+    expires_at = time.mktime(time.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S"))
+    if time.time() > expires_at:
+        logger.info(f"Share token {share_token} has expired")
+        return None
+
+    # Increment access count
+    share["access_count"] = share.get("access_count", 0) + 1
+    save_dashboard_shares()
+
+    # Get the dashboard
+    dashboards = load_dashboards_store()
+    dashboard = next((d for d in dashboards if d["id"] == share["dashboard_id"]), None)
+
+    if dashboard:
+        logger.info(f"Share token {share_token} accessed (count: {share['access_count']})")
+
+    return dashboard
+
+def revoke_dashboard_share(share_token: str) -> bool:
+    """Revoke a dashboard share token."""
+    load_dashboard_shares()
+
+    if share_token in DASHBOARD_SHARES:
+        del DASHBOARD_SHARES[share_token]
+        save_dashboard_shares()
+        logger.info(f"Revoked share token {share_token}")
+        return True
+
+    return False
+
+def list_dashboard_shares(dashboard_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List all dashboard shares, optionally filtered by dashboard_id."""
+    load_dashboard_shares()
+
+    shares = []
+    for token, share in DASHBOARD_SHARES.items():
+        if dashboard_id is None or share["dashboard_id"] == dashboard_id:
+            shares.append({
+                "token": token,
+                **share
+            })
+
+    return sorted(shares, key=lambda x: x["created_at"], reverse=True)
 
 def execute_widget_query(conn, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     # Check cache first

@@ -4373,6 +4373,12 @@
               <span x-show="autoRefreshEnabled" class="text-xs text-slate-500 dark:text-slate-400 font-mono" x-text="'Next: ' + autoRefreshCountdown + 's'"></span>
             </div>
 
+            <!-- Share Dashboard Button -->
+            <button @click="shareCurrentDashboard()" class="px-3 py-1.5 bg-white hover:bg-slate-50 dark:bg-dbx-panel dark:hover:bg-dbx-hover text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition border border-slate-200 dark:border-dbx-border">
+              <i class="ph ph-share-network text-xs"></i>
+              <span>Share</span>
+            </button>
+
             <button @click="openAddWidgetModal()" class="px-3 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
               <i class="ph ph-plus text-xs"></i>
               <span>Add Widget</span>
@@ -14744,6 +14750,41 @@
         async refreshCurrentDashboard() {
           if (this.selectedDashboardId) {
             await this.fetchDashboard(this.selectedDashboardId);
+          }
+        },
+
+        async shareCurrentDashboard() {
+          if (!this.selectedDashboardId) {
+            alert('Please select a dashboard first');
+            return;
+          }
+
+          const expiresInDays = prompt('Share link expires in how many days? (default: 30)', '30');
+          if (!expiresInDays) return;
+
+          try {
+            const res = await fetch(`/api/dashboards/${this.selectedDashboardId}/share?expires_in_days=${expiresInDays}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              const shareUrl = `${window.location.origin}${data.share_url}`;
+
+              // Copy to clipboard
+              try {
+                await navigator.clipboard.writeText(shareUrl);
+                alert(`✅ Share link copied to clipboard!\n\nURL: ${shareUrl}\n\nExpires in: ${data.expires_in_days} days\n\nAnyone with this link can view the dashboard (no login required).`);
+              } catch (e) {
+                // Fallback if clipboard API fails
+                prompt('Share link created! Copy this URL:', shareUrl);
+              }
+            } else {
+              alert('Failed to create share link: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error creating share link: ' + e.message);
           }
         },
 
