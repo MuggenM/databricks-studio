@@ -102,7 +102,12 @@ DEFAULT_DASHBOARDS = [
                 "x_col": "department",
                 "y_col": "avg_salary",
                 "unit": "$",
-                "width": "col-span-2"
+                "width": "col-span-2",
+                "drill_down": {
+                    "enabled": True,
+                    "target": "sql_editor",
+                    "query_template": "SELECT employee_id, full_name, salary, rank, hire_date FROM silver_employees WHERE department = '{value}' ORDER BY salary DESC"
+                }
             },
             {
                 "id": "w_chart_2",
@@ -113,7 +118,12 @@ DEFAULT_DASHBOARDS = [
                 "x_col": "sector",
                 "y_col": "total_mcap",
                 "unit": "$B",
-                "width": "col-span-2"
+                "width": "col-span-2",
+                "drill_down": {
+                    "enabled": True,
+                    "target": "sql_editor",
+                    "query_template": "SELECT company, ticker, market_cap_b, pe_ratio, sector FROM nyse_tickers WHERE sector = '{value}' ORDER BY market_cap_b DESC"
+                }
             },
             {
                 "id": "w_chart_3",
@@ -206,11 +216,16 @@ DEFAULT_DASHBOARDS = [
                 "id": "w_scatter_1",
                 "title": "Salary vs Bonus Analysis",
                 "type": "scatter",
-                "query": "SELECT salary, bonus_estimate FROM silver_employees WHERE salary IS NOT NULL AND bonus_estimate IS NOT NULL AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
+                "query": "SELECT employee_id, full_name, salary, bonus_estimate, department FROM silver_employees WHERE salary IS NOT NULL AND bonus_estimate IS NOT NULL AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "x_col": "salary",
                 "y_col": "bonus_estimate",
                 "unit": "$",
-                "width": "col-span-2"
+                "width": "col-span-2",
+                "drill_down": {
+                    "enabled": True,
+                    "target": "sql_editor",
+                    "query_template": "SELECT employee_id, full_name, department, rank, salary, bonus_estimate, hire_date FROM silver_employees WHERE employee_id = '{employee_id}'"
+                }
             },
             {
                 "id": "w_scatter_2",

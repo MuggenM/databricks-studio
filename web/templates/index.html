@@ -14597,6 +14597,40 @@
           }
         },
 
+        handleDrillDown(widget, params) {
+          if (!widget.drill_down || !widget.drill_down.enabled) return;
+
+          const drillConfig = widget.drill_down;
+          let queryText = drillConfig.query_template;
+
+          // Replace {value} with the clicked value
+          if (params.name) {
+            queryText = queryText.replace(/\{value\}/g, params.name);
+          }
+
+          // For scatter plots, replace with data point values
+          if (widget.type === 'scatter' && params.data && widget.result && widget.result.rows) {
+            const rowIndex = params.dataIndex;
+            const row = widget.result.rows[rowIndex];
+            if (row) {
+              // Replace all placeholders with actual row values
+              Object.keys(row).forEach(key => {
+                const regex = new RegExp(`\\{${key}\\}`, 'g');
+                queryText = queryText.replace(regex, row[key]);
+              });
+            }
+          }
+
+          // Navigate to SQL Editor with the drill-down query
+          if (drillConfig.target === 'sql_editor') {
+            this.view = 'sql';
+            this.$nextTick(() => {
+              this.sqlQuery = queryText;
+              this.runSqlQuery();
+            });
+          }
+        },
+
         setDatePreset(preset) {
           this.datePreset = preset;
           const now = new Date();
@@ -15266,8 +15300,14 @@
               echartsInstance.setOption(option, true);
               echartsInstance.on('click', (params) => {
                 if (params && params.name) {
-                  const dim = widget.filter_dimension || (widget.type === 'pie' ? 'sector' : (widget.x_col || 'department'));
-                  this.handleChartCrossFilter(dim, params.name);
+                  // Check if drill-down is enabled
+                  if (widget.drill_down && widget.drill_down.enabled) {
+                    this.handleDrillDown(widget, params);
+                  } else {
+                    // Fallback to cross-filter
+                    const dim = widget.filter_dimension || (widget.type === 'pie' ? 'sector' : (widget.x_col || 'department'));
+                    this.handleChartCrossFilter(dim, params.name);
+                  }
                 }
               });
               this.chartInstances[widget.id] = echartsInstance;
