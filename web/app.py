@@ -2104,6 +2104,47 @@ async def view_shared_dashboard(share_token: str):
 
     return HTMLResponse(content=html_content)
 
+@app.get("/api/dashboards/templates")
+async def list_dashboard_templates(current_user: dict = Depends(get_current_user)):
+    """List all available dashboard templates."""
+    from web.dashboard_templates import get_all_templates
+    templates = get_all_templates()
+    return {"success": True, "templates": templates}
+
+@app.get("/api/dashboards/templates/{template_id}")
+async def get_dashboard_template(template_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific dashboard template."""
+    from web.dashboard_templates import get_template_by_id
+    template = get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"success": True, "template": template}
+
+@app.post("/api/dashboards/from-template/{template_id}")
+async def create_dashboard_from_template(
+    template_id: str,
+    dashboard_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new dashboard from a template."""
+    from web.dashboard_templates import instantiate_template
+    from web.dashboards import load_dashboards_store, save_dashboards_store
+
+    dashboard = instantiate_template(template_id, dashboard_name)
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    # Add to dashboards store
+    dashboards = load_dashboards_store()
+    dashboards.append(dashboard)
+    save_dashboards_store(dashboards)
+
+    return {
+        "success": True,
+        "dashboard_id": dashboard["id"],
+        "message": f"Dashboard created from template: {dashboard['name']}"
+    }
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 
