@@ -24,6 +24,8 @@ DEFAULT_DASHBOARDS = [
         "name": "Executive Lakehouse Overview",
         "description": "Real-time KPI metrics and visual analytics across workforce, market equity, products, and customer revenue with interactive parameters.",
         "created_at": "2026-09-12 02:30:00",
+        "auto_refresh_enabled": False,
+        "auto_refresh_interval": 30,
         "filters": [
             {
                 "key": "department",

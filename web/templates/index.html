@@ -4351,6 +4351,26 @@
               <i class="ph ph-arrows-clockwise text-xs" :class="{'animate-spin': isLoadingDashboard}"></i>
               <span>Refresh</span>
             </button>
+
+            <!-- Auto-Refresh Controls -->
+            <div class="flex items-center space-x-2 border-l border-slate-300 dark:border-dbx-border pl-2">
+              <button @click="toggleAutoRefresh()" class="px-3 py-1.5 rounded text-xs flex items-center space-x-1.5 transition shadow-xs" :class="autoRefreshEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-white hover:bg-slate-50 dark:bg-dbx-panel dark:hover:bg-dbx-hover border border-slate-200 dark:border-dbx-border text-slate-700 dark:text-slate-200'">
+                <i class="ph text-xs" :class="autoRefreshEnabled ? 'ph-pause' : 'ph-play'"></i>
+                <span x-text="autoRefreshEnabled ? 'Auto-Refresh On' : 'Auto-Refresh Off'"></span>
+              </button>
+
+              <select x-model="autoRefreshInterval" @change="updateAutoRefreshInterval()" class="bg-white dark:bg-dbx-panel text-slate-900 dark:text-white text-xs border border-slate-200 dark:border-dbx-border rounded px-2 py-1.5 focus:outline-none cursor-pointer shadow-xs">
+                <option value="10">10s</option>
+                <option value="15">15s</option>
+                <option value="30">30s</option>
+                <option value="60">1m</option>
+                <option value="120">2m</option>
+                <option value="300">5m</option>
+              </select>
+
+              <span x-show="autoRefreshEnabled" class="text-xs text-slate-500 dark:text-slate-400 font-mono" x-text="'Next: ' + autoRefreshCountdown + 's'"></span>
+            </div>
+
             <button @click="openAddWidgetModal()" class="px-3 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
               <i class="ph ph-plus text-xs"></i>
               <span>Add Widget</span>
@@ -11667,6 +11687,11 @@
         selectedDashboardId: '',
         currentDashboard: null,
         isLoadingDashboard: false,
+        autoRefreshEnabled: false,
+        autoRefreshInterval: 30,
+        autoRefreshTimer: null,
+        autoRefreshCountdown: 30,
+        autoRefreshCountdownTimer: null,
         showAddWidgetModal: false,
         showNewDashboardModal: false,
         widgetTesting: false,
@@ -12473,6 +12498,10 @@
               });
             } else if (val === 'dbt') {
               this.fetchDbtAll();
+            }
+            if (val !== 'dashboards') {
+              this.stopAutoRefresh();
+              this.autoRefreshEnabled = false;
             }
           });
 
@@ -14485,11 +14514,18 @@
         },
 
         async selectDashboard(id) {
+          this.stopAutoRefresh();
+          this.autoRefreshEnabled = false;
           this.selectedDashboardId = id;
           await this.fetchDashboardFilters(id);
           await this.fetchDashboard(id);
           if (this.currentDashboard) {
             this.recordRecent('dashboard', id, this.currentDashboard.name, `${this.currentDashboard.widgets?.length || 0} widgets`, { id });
+            if (this.currentDashboard.auto_refresh_enabled) {
+              this.autoRefreshInterval = this.currentDashboard.auto_refresh_interval || 30;
+              this.autoRefreshEnabled = true;
+              this.startAutoRefresh();
+            }
           }
         },
 
@@ -14622,6 +14658,52 @@
         async refreshCurrentDashboard() {
           if (this.selectedDashboardId) {
             await this.fetchDashboard(this.selectedDashboardId);
+          }
+        },
+
+        toggleAutoRefresh() {
+          this.autoRefreshEnabled = !this.autoRefreshEnabled;
+          if (this.autoRefreshEnabled) {
+            this.startAutoRefresh();
+          } else {
+            this.stopAutoRefresh();
+          }
+        },
+
+        startAutoRefresh() {
+          this.stopAutoRefresh();
+          this.autoRefreshCountdown = this.autoRefreshInterval;
+
+          this.autoRefreshTimer = setInterval(async () => {
+            if (!this.isLoadingDashboard) {
+              await this.refreshCurrentDashboard();
+              this.autoRefreshCountdown = this.autoRefreshInterval;
+            }
+          }, this.autoRefreshInterval * 1000);
+
+          this.autoRefreshCountdownTimer = setInterval(() => {
+            if (this.autoRefreshCountdown > 0) {
+              this.autoRefreshCountdown--;
+            } else {
+              this.autoRefreshCountdown = this.autoRefreshInterval;
+            }
+          }, 1000);
+        },
+
+        stopAutoRefresh() {
+          if (this.autoRefreshTimer) {
+            clearInterval(this.autoRefreshTimer);
+            this.autoRefreshTimer = null;
+          }
+          if (this.autoRefreshCountdownTimer) {
+            clearInterval(this.autoRefreshCountdownTimer);
+            this.autoRefreshCountdownTimer = null;
+          }
+        },
+
+        updateAutoRefreshInterval() {
+          if (this.autoRefreshEnabled) {
+            this.startAutoRefresh();
           }
         },
 
