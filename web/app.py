@@ -1963,6 +1963,77 @@ async def delete_widget(dashboard_id: str, widget_id: str):
     save_dashboards_store(dashboards)
     return {"success": True, "deleted_widget_id": widget_id}
 
+@app.get("/api/dashboards/{dashboard_id}/widgets/{widget_id}/export")
+async def export_widget(dashboard_id: str, widget_id: str, format: str = "csv", params: Optional[str] = None):
+    """
+    Export widget data in CSV or Parquet format.
+    Params:
+      - format: 'csv' or 'parquet'
+      - params: JSON string of filter parameters
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+
+    dashboards = load_dashboards_store()
+    target_dashboard = next((d for d in dashboards if d["id"] == dashboard_id), None)
+    if not target_dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    target_widget = next((w for w in target_dashboard.get("widgets", []) if w["id"] == widget_id), None)
+    if not target_widget:
+        raise HTTPException(status_code=404, detail="Widget not found")
+
+    # Parse filter parameters
+    filter_params = {}
+    if params:
+        try:
+            filter_params = json.loads(params)
+        except:
+            filter_params = {}
+
+    # Execute the query
+    conn = get_duckrun_conn()
+    query = target_widget.get("query", "")
+    result = execute_widget_query(conn, query, filter_params)
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=f"Query failed: {result.get('error')}")
+
+    # Convert to DataFrame
+    rows = result.get("rows", [])
+    if not rows:
+        raise HTTPException(status_code=404, detail="No data to export")
+
+    df = pd.DataFrame(rows)
+
+    # Export based on format
+    if format.lower() == "csv":
+        output = io.StringIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+
+        filename = f"{widget_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    elif format.lower() == "parquet":
+        output = io.BytesIO()
+        df.to_parquet(output, index=False, engine='pyarrow')
+        output.seek(0)
+
+        filename = f"{widget_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+        return StreamingResponse(
+            output,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {format}. Use 'csv' or 'parquet'")
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 

@@ -4448,9 +4448,31 @@
                       <span class="text-[10px] text-slate-500 uppercase font-mono" x-text="widget.type"></span>
                     </div>
                   </div>
-                  <button @click="deleteWidget(widget.id)" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 rounded transition" title="Delete Widget">
-                    <i class="ph ph-trash text-xs"></i>
-                  </button>
+                  <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition">
+                    <!-- Export Dropdown -->
+                    <div class="relative" x-data="{ exportOpen: false }">
+                      <button @click="exportOpen = !exportOpen" class="text-slate-500 hover:text-blue-400 p-1 rounded transition" title="Export Data">
+                        <i class="ph ph-download text-xs"></i>
+                      </button>
+                      <div x-show="exportOpen" @click.away="exportOpen = false" class="absolute right-0 mt-1 w-32 bg-slate-900 border border-dbx-border rounded-lg shadow-xl z-50 py-1">
+                        <button @click="exportWidget(widget.id, 'csv'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
+                          <i class="ph ph-file-csv text-xs"></i>
+                          <span>CSV</span>
+                        </button>
+                        <button @click="exportWidget(widget.id, 'parquet'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
+                          <i class="ph ph-file text-xs"></i>
+                          <span>Parquet</span>
+                        </button>
+                        <button x-show="!['kpi', 'big_number_trendline', 'table', 'pivot_table'].includes(widget.type)" @click="exportChartPNG(widget.id); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2 border-t border-dbx-border/50">
+                          <i class="ph ph-image text-xs"></i>
+                          <span>PNG</span>
+                        </button>
+                      </div>
+                    </div>
+                    <button @click="deleteWidget(widget.id)" class="text-slate-500 hover:text-red-400 p-1 rounded transition" title="Delete Widget">
+                      <i class="ph ph-trash text-xs"></i>
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Query Error Banner -->
@@ -15503,6 +15525,57 @@
             }
           } catch (e) {
             console.error('Failed to delete widget:', e);
+          }
+        },
+
+        async exportWidget(widgetId, format) {
+          try {
+            // Build URL with filter parameters
+            const params = JSON.stringify(this.activeFilters);
+            const url = `/api/dashboards/${this.selectedDashboardId}/widgets/${widgetId}/export?format=${format}&params=${encodeURIComponent(params)}`;
+
+            // Trigger download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${widgetId}_${Date.now()}.${format}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log(`Exported widget ${widgetId} as ${format}`);
+          } catch (e) {
+            console.error('Failed to export widget:', e);
+            alert('Export failed: ' + e.message);
+          }
+        },
+
+        exportChartPNG(widgetId) {
+          try {
+            const chartInstance = this.chartInstances[widgetId];
+            if (!chartInstance) {
+              alert('Chart not found or not rendered yet');
+              return;
+            }
+
+            // Use ECharts built-in getDataURL to export as PNG
+            const dataURL = chartInstance.getDataURL({
+              type: 'png',
+              pixelRatio: 2, // Higher quality
+              backgroundColor: '#0b111e' // Match dark theme
+            });
+
+            // Trigger download
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = `${widgetId}_${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log(`Exported chart ${widgetId} as PNG`);
+          } catch (e) {
+            console.error('Failed to export chart as PNG:', e);
+            alert('PNG export failed: ' + e.message);
           }
         },
 
