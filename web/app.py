@@ -2034,6 +2034,24 @@ async def export_widget(dashboard_id: str, widget_id: str, format: str = "csv", 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {format}. Use 'csv' or 'parquet'")
 
+@app.post("/api/dashboards/cache/clear")
+async def clear_dashboard_cache(current_user: dict = Depends(get_current_user)):
+    """Clear all cached dashboard query results."""
+    from web.dashboards import clear_query_cache, QUERY_CACHE
+    cache_size = len(QUERY_CACHE)
+    clear_query_cache()
+    return {"success": True, "message": f"Cleared {cache_size} cached queries"}
+
+@app.get("/api/dashboards/cache/stats")
+async def get_cache_stats(current_user: dict = Depends(get_current_user)):
+    """Get query cache statistics."""
+    from web.dashboards import QUERY_CACHE, CACHE_TTL_SECONDS, MAX_CACHE_SIZE
+    return {
+        "cached_queries": len(QUERY_CACHE),
+        "max_cache_size": MAX_CACHE_SIZE,
+        "default_ttl_seconds": CACHE_TTL_SECONDS
+    }
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 

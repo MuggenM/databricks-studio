@@ -3,11 +3,17 @@ import re
 import json
 import time
 import uuid
+import hashlib
 import logging
 from typing import Dict, Any, List, Optional
 from web.audit import log_query
 
 logger = logging.getLogger("localspark.dashboards")
+
+# Query result cache: {cache_key: {result, timestamp, ttl}}
+QUERY_CACHE = {}
+CACHE_TTL_SECONDS = 300  # 5 minutes default
+MAX_CACHE_SIZE = 100  # Maximum number of cached queries
 
 WAREHOUSE_DIR = os.getenv("WAREHOUSE_DIR", "/workspace/warehouse")
 if not os.path.exists(WAREHOUSE_DIR):
@@ -385,7 +391,52 @@ def json_serializable_row(row: Dict[str, Any]) -> Dict[str, Any]:
             new_row[k] = v
     return new_row
 
+def get_cache_key(query: str, params: Optional[Dict[str, Any]] = None) -> str:
+    """Generate a unique cache key from query and parameters."""
+    cache_str = query + json.dumps(params or {}, sort_keys=True)
+    return hashlib.md5(cache_str.encode()).hexdigest()
+
+def get_cached_result(cache_key: str) -> Optional[Dict[str, Any]]:
+    """Retrieve cached query result if still valid."""
+    if cache_key in QUERY_CACHE:
+        entry = QUERY_CACHE[cache_key]
+        age = time.time() - entry['timestamp']
+        if age < entry['ttl']:
+            logger.info(f"Cache HIT for key {cache_key[:8]}... (age: {age:.1f}s)")
+            return entry['result']
+        else:
+            logger.info(f"Cache EXPIRED for key {cache_key[:8]}... (age: {age:.1f}s)")
+            del QUERY_CACHE[cache_key]
+    return None
+
+def cache_result(cache_key: str, result: Dict[str, Any], ttl: int = CACHE_TTL_SECONDS):
+    """Store query result in cache with TTL."""
+    # Evict oldest entries if cache is full
+    if len(QUERY_CACHE) >= MAX_CACHE_SIZE:
+        oldest_key = min(QUERY_CACHE.keys(), key=lambda k: QUERY_CACHE[k]['timestamp'])
+        del QUERY_CACHE[oldest_key]
+        logger.info(f"Cache EVICTED oldest entry {oldest_key[:8]}...")
+
+    QUERY_CACHE[cache_key] = {
+        'result': result,
+        'timestamp': time.time(),
+        'ttl': ttl
+    }
+    logger.info(f"Cache STORED key {cache_key[:8]}... (entries: {len(QUERY_CACHE)})")
+
+def clear_query_cache():
+    """Clear all cached query results."""
+    QUERY_CACHE.clear()
+    logger.info("Query cache cleared")
+
 def execute_widget_query(conn, query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    # Check cache first
+    cache_key = get_cache_key(query, params)
+    cached = get_cached_result(cache_key)
+    if cached:
+        cached['from_cache'] = True
+        return cached
+
     start = time.perf_counter()
     resolved_query = resolve_query_parameters(query, params)
     try:
@@ -395,7 +446,8 @@ def execute_widget_query(conn, query: str, params: Optional[Dict[str, Any]] = No
         columns = [{"name": col, "type": str(df[col].dtype)} for col in df.columns]
         rows = [json_serializable_row(r) for r in df.to_dict(orient="records")]
         qid = log_query(query_text=resolved_query, duration_ms=elapsed_ms, rows_produced=len(rows), status="SUCCESS", client="DASHBOARD")
-        return {
+
+        result = {
             "success": True,
             "query_id": qid,
             "query_executed": resolved_query,
@@ -403,8 +455,13 @@ def execute_widget_query(conn, query: str, params: Optional[Dict[str, Any]] = No
             "rows": rows,
             "row_count": len(rows),
             "elapsed_ms": elapsed_ms,
-            "error": None
+            "error": None,
+            "from_cache": False
         }
+
+        # Cache the result
+        cache_result(cache_key, result)
+        return result
     except Exception as e:
         elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
         qid = log_query(query_text=resolved_query, duration_ms=elapsed_ms, rows_produced=0, status="FAILED", error_message=str(e), client="DASHBOARD")

@@ -4476,6 +4476,7 @@
                     <h4 class="text-xs font-bold text-slate-200 tracking-wide" x-text="widget.title"></h4>
                     <div class="flex items-center space-x-2 mt-0.5">
                       <span class="text-[10px] text-slate-400 font-mono" x-show="widget.result && widget.result.elapsed_ms" x-text="widget.result.elapsed_ms + 'ms'"></span>
+                      <span class="text-[9px] text-emerald-400 font-bold uppercase tracking-wide px-1.5 py-0.5 bg-emerald-500/10 rounded" x-show="widget.result && widget.result.from_cache" title="Result from cache">⚡ CACHED</span>
                       <span class="text-[10px] text-slate-500 uppercase font-mono" x-text="widget.type"></span>
                     </div>
                   </div>
