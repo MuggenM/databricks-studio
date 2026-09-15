@@ -73,7 +73,14 @@ DEFAULT_DASHBOARDS = [
                 "type": "kpi",
                 "query": "SELECT COUNT(*) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "unit": "employees",
-                "width": "col-span-1"
+                "width": "col-span-1",
+                "thresholds": {
+                    "enabled": True,
+                    "critical_low": 3,
+                    "warning_low": 4,
+                    "warning_high": None,
+                    "critical_high": None
+                }
             },
             {
                 "id": "w_kpi_2",
@@ -81,7 +88,14 @@ DEFAULT_DASHBOARDS = [
                 "type": "kpi",
                 "query": "SELECT SUM(salary) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
                 "unit": "$",
-                "width": "col-span-1"
+                "width": "col-span-1",
+                "thresholds": {
+                    "enabled": True,
+                    "critical_low": None,
+                    "warning_low": None,
+                    "warning_high": 600000,
+                    "critical_high": 700000
+                }
             },
             {
                 "id": "w_kpi_3",

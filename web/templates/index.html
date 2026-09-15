@@ -4469,7 +4469,7 @@
           <!-- Widgets Grid -->
           <div x-show="!isLoadingDashboard && currentDashboard && currentDashboard.widgets && currentDashboard.widgets.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <template x-for="widget in (currentDashboard ? currentDashboard.widgets : [])" :key="widget.id">
-              <div :class="getWidgetColSpanClass(widget.width || (widget.type === 'kpi' ? 'col-span-1' : 'col-span-2'))" class="bg-dbx-panel border border-dbx-border rounded-lg p-4 flex flex-col justify-between group shadow-sm hover:border-slate-700 transition">
+              <div :class="[getWidgetColSpanClass(widget.width || (widget.type === 'kpi' ? 'col-span-1' : 'col-span-2')), getWidgetBorderClass(widget)]" class="bg-dbx-panel rounded-lg p-4 flex flex-col justify-between group shadow-sm transition">
                 <!-- Widget Header -->
                 <div class="flex items-start justify-between mb-2">
                   <div>
@@ -4515,8 +4515,17 @@
 
                 <!-- KPI Metric Widget (Big Number) -->
                 <div x-show="widget.type === 'kpi' && widget.result && widget.result.success" class="my-auto py-2">
-                  <div class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight font-mono">
-                    <span x-text="formatKpiValue(widget)"></span>
+                  <div class="flex items-center justify-between">
+                    <div class="text-2xl lg:text-3xl font-extrabold tracking-tight font-mono"
+                         :class="getThresholdTextColor(widget)">
+                      <span x-text="formatKpiValue(widget)"></span>
+                    </div>
+                    <span x-show="getThresholdStatus(widget) !== 'normal'"
+                          class="text-xs px-2 py-1 rounded-md font-bold uppercase tracking-wide flex items-center space-x-1"
+                          :class="getThresholdBadgeClass(widget)">
+                      <i :class="getThresholdIcon(widget)"></i>
+                      <span x-text="getThresholdLabel(widget)"></span>
+                    </span>
                   </div>
                   <div class="text-[11px] text-slate-400 mt-1 truncate" :title="widget.query" x-text="widget.query"></div>
                 </div>
@@ -14791,6 +14800,14 @@
           return 'col-span-1 md:col-span-2 lg:col-span-2';
         },
 
+        getWidgetBorderClass(widget) {
+          if (widget.type !== 'kpi') return 'border border-dbx-border hover:border-slate-700';
+          const status = this.getThresholdStatus(widget);
+          if (status === 'critical_high' || status === 'critical_low') return 'border-2 border-red-500/60 shadow-lg shadow-red-500/20';
+          if (status === 'warning_high' || status === 'warning_low') return 'border-2 border-yellow-500/60 shadow-lg shadow-yellow-500/20';
+          return 'border border-dbx-border hover:border-slate-700';
+        },
+
         formatKpiValue(widget) {
           if (!widget.result || !widget.result.rows || widget.result.rows.length === 0) return '0';
           const firstRow = widget.result.rows[0];
@@ -14823,6 +14840,50 @@
           if (first === 0) return '+100%';
           const pct = ((last - first) / Math.abs(first)) * 100;
           return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+        },
+
+        getThresholdStatus(widget) {
+          if (!widget.thresholds || !widget.thresholds.enabled) return 'normal';
+          if (!widget.result || !widget.result.rows || widget.result.rows.length === 0) return 'normal';
+
+          const firstRow = widget.result.rows[0];
+          const value = Number(firstRow.value) || 0;
+          const t = widget.thresholds;
+
+          if (t.critical_high !== null && t.critical_high !== undefined && value >= t.critical_high) return 'critical_high';
+          if (t.critical_low !== null && t.critical_low !== undefined && value <= t.critical_low) return 'critical_low';
+          if (t.warning_high !== null && t.warning_high !== undefined && value >= t.warning_high) return 'warning_high';
+          if (t.warning_low !== null && t.warning_low !== undefined && value <= t.warning_low) return 'warning_low';
+
+          return 'normal';
+        },
+
+        getThresholdTextColor(widget) {
+          const status = this.getThresholdStatus(widget);
+          if (status === 'critical_high' || status === 'critical_low') return 'text-red-400';
+          if (status === 'warning_high' || status === 'warning_low') return 'text-yellow-400';
+          return 'text-white';
+        },
+
+        getThresholdBadgeClass(widget) {
+          const status = this.getThresholdStatus(widget);
+          if (status === 'critical_high' || status === 'critical_low') return 'bg-red-500/20 text-red-400 border border-red-500/40';
+          if (status === 'warning_high' || status === 'warning_low') return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40';
+          return '';
+        },
+
+        getThresholdIcon(widget) {
+          const status = this.getThresholdStatus(widget);
+          if (status === 'critical_high' || status === 'warning_high') return 'ph ph-arrow-up text-sm';
+          if (status === 'critical_low' || status === 'warning_low') return 'ph ph-arrow-down text-sm';
+          return 'ph ph-warning text-sm';
+        },
+
+        getThresholdLabel(widget) {
+          const status = this.getThresholdStatus(widget);
+          if (status === 'critical_high' || status === 'critical_low') return 'Critical';
+          if (status === 'warning_high' || status === 'warning_low') return 'Warning';
+          return 'Alert';
         },
 
         getPivotTableData(widget) {
