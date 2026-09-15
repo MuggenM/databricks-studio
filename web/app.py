@@ -2145,6 +2145,70 @@ async def create_dashboard_from_template(
         "message": f"Dashboard created from template: {dashboard['name']}"
     }
 
+@app.post("/api/dashboards/{dashboard_id}/version")
+async def create_dashboard_version(
+    dashboard_id: str,
+    comment: str = "",
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a version snapshot of a dashboard."""
+    from web.dashboards import load_dashboards_store
+    from web.dashboard_versions import create_version
+
+    dashboards = load_dashboards_store()
+    dashboard = next((d for d in dashboards if d["id"] == dashboard_id), None)
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    version_id = create_version(dashboard_id, dashboard, current_user["username"], comment)
+    return {"success": True, "version_id": version_id}
+
+@app.get("/api/dashboards/{dashboard_id}/versions")
+async def list_dashboard_versions(dashboard_id: str, current_user: dict = Depends(get_current_user)):
+    """List all versions of a dashboard."""
+    from web.dashboard_versions import list_versions
+    versions = list_versions(dashboard_id)
+    return {"success": True, "versions": versions}
+
+@app.post("/api/dashboards/{dashboard_id}/restore/{version_id}")
+async def restore_dashboard_version(
+    dashboard_id: str,
+    version_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Restore a dashboard to a specific version."""
+    from web.dashboard_versions import restore_version
+    from web.dashboards import load_dashboards_store, save_dashboards_store
+
+    dashboard_config = restore_version(dashboard_id, version_id)
+    if not dashboard_config:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    dashboards = load_dashboards_store()
+    for i, d in enumerate(dashboards):
+        if d["id"] == dashboard_id:
+            dashboards[i] = dashboard_config
+            break
+
+    save_dashboards_store(dashboards)
+    return {"success": True, "message": "Dashboard restored"}
+
+@app.get("/api/themes")
+async def list_themes():
+    """List all available themes."""
+    from web.dashboard_themes import get_all_themes
+    themes = get_all_themes()
+    return {"success": True, "themes": themes}
+
+@app.get("/api/themes/{theme_id}")
+async def get_theme(theme_id: str):
+    """Get a specific theme."""
+    from web.dashboard_themes import get_theme as get_theme_data
+    theme = get_theme_data(theme_id)
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    return {"success": True, "theme": theme}
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 
