@@ -12796,6 +12796,8 @@
           if (item.type === 'directory') {
             this.workspaceFileDetail = null;
           } else {
+            // Ensure we're in split view mode to show the detail panel
+            this.workspaceViewMode = 'split';
             this.fetchWorkspaceFileDetail(item.rel_path);
             const itype = item.type === 'notebook' ? 'notebook' : 'file';
             const sub = item.rel_path.includes('/') ? item.rel_path.substring(0, item.rel_path.lastIndexOf('/')) : 'workspace';
@@ -13334,6 +13336,10 @@
             const res = await fetch(`/api/table/${schemaName}/${tableName}${catParam}`);
             if (res.ok) {
               this.selectedTable = await res.json();
+              // Ensure we show the schema & tests tab by default if no tab is active
+              if (!this.activeCatalogTab) {
+                this.activeCatalogTab = 'schema';
+              }
               if (this.activeCatalogTab === 'preview') {
                 this.fetchTablePreview(schemaName, tableName, catalog);
               } else if (this.activeCatalogTab === 'lineage') {
