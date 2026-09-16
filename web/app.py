@@ -1893,7 +1893,7 @@ class CreateDashboardRequest(BaseModel):
     description: Optional[str] = ""
 
 @app.post("/api/dashboards")
-async def create_dashboard(payload: CreateDashboardRequest):
+async def create_dashboard(payload: CreateDashboardRequest, current_user: dict = Depends(get_current_user)):
     dashboards = load_dashboards_store()
     new_id = f"dash_{uuid.uuid4().hex[:10]}"
     new_dash = {
@@ -1901,17 +1901,33 @@ async def create_dashboard(payload: CreateDashboardRequest):
         "name": payload.name.strip() or "Untitled Dashboard",
         "description": payload.description or "",
         "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "created_by": current_user["username"],
         "widgets": []
     }
     dashboards.append(new_dash)
     save_dashboards_store(dashboards)
+
+    # Initialize permissions for new dashboard
+    from web.dashboard_permissions import initialize_dashboard_permissions
+    initialize_dashboard_permissions(new_id, current_user["username"])
+
     return new_dash
 
 @app.delete("/api/dashboards/{dashboard_id}")
-async def delete_dashboard(dashboard_id: str):
+async def delete_dashboard(dashboard_id: str, current_user: dict = Depends(get_current_user)):
+    # Check permissions
+    from web.dashboard_permissions import can_delete_dashboard
+    if not can_delete_dashboard(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this dashboard")
+
     dashboards = load_dashboards_store()
     dashboards = [d for d in dashboards if d["id"] != dashboard_id]
     save_dashboards_store(dashboards)
+
+    # Cleanup permissions
+    from web.dashboard_permissions import cleanup_dashboard_permissions
+    cleanup_dashboard_permissions(dashboard_id)
+
     return {"success": True, "deleted_id": dashboard_id}
 
 class WidgetPayload(BaseModel):
@@ -2279,6 +2295,131 @@ async def delete_widget_comment(widget_id: str, comment_id: str, current_user: d
     if not success:
         raise HTTPException(status_code=404, detail="Comment not found")
     return {"success": True}
+
+# ==================== DASHBOARD PERMISSIONS APIS ====================
+
+@app.get("/api/dashboards/{dashboard_id}/permissions")
+async def get_dashboard_permissions(dashboard_id: str, current_user: dict = Depends(get_current_user)):
+    """Get permissions for a dashboard."""
+    from web.dashboard_permissions import get_dashboard_permissions as get_perms, can_manage_permissions
+
+    # Check if user can manage permissions
+    if not can_manage_permissions(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to view permissions")
+
+    perms = get_perms(dashboard_id)
+    if not perms:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    return {"success": True, "permissions": perms}
+
+@app.post("/api/dashboards/{dashboard_id}/permissions/grant")
+async def grant_dashboard_permission(
+    dashboard_id: str,
+    user: Optional[str] = None,
+    role: Optional[str] = None,
+    level: str = "viewer",
+    current_user: dict = Depends(get_current_user)
+):
+    """Grant permission to a user or role."""
+    from web.dashboard_permissions import grant_permission, can_manage_permissions
+
+    # Check if user can manage permissions
+    if not can_manage_permissions(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to grant permissions")
+
+    success = grant_permission(
+        dashboard_id=dashboard_id,
+        user=user,
+        role=role,
+        level=level,
+        granted_by=current_user["username"]
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to grant permission")
+
+    return {"success": True, "message": "Permission granted"}
+
+@app.post("/api/dashboards/{dashboard_id}/permissions/revoke")
+async def revoke_dashboard_permission(
+    dashboard_id: str,
+    user: Optional[str] = None,
+    role: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Revoke permission from a user or role."""
+    from web.dashboard_permissions import revoke_permission, can_manage_permissions
+
+    # Check if user can manage permissions
+    if not can_manage_permissions(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to revoke permissions")
+
+    success = revoke_permission(dashboard_id=dashboard_id, user=user, role=role)
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to revoke permission")
+
+    return {"success": True, "message": "Permission revoked"}
+
+@app.post("/api/dashboards/{dashboard_id}/permissions/public")
+async def set_dashboard_public_status(
+    dashboard_id: str,
+    is_public: bool,
+    current_user: dict = Depends(get_current_user)
+):
+    """Set whether a dashboard is publicly viewable."""
+    from web.dashboard_permissions import set_dashboard_public, can_manage_permissions
+
+    # Check if user can manage permissions
+    if not can_manage_permissions(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to change public status")
+
+    success = set_dashboard_public(dashboard_id, is_public)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    return {"success": True, "is_public": is_public}
+
+@app.post("/api/dashboards/{dashboard_id}/permissions/transfer")
+async def transfer_dashboard_ownership(
+    dashboard_id: str,
+    new_owner: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Transfer dashboard ownership to another user."""
+    from web.dashboard_permissions import transfer_ownership, can_manage_permissions
+
+    # Check if user can manage permissions
+    if not can_manage_permissions(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to transfer ownership")
+
+    success = transfer_ownership(dashboard_id, new_owner, current_user["username"])
+
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to transfer ownership")
+
+    return {"success": True, "message": f"Ownership transferred to {new_owner}"}
+
+@app.get("/api/dashboards/{dashboard_id}/permissions/users")
+async def list_dashboard_users(dashboard_id: str, current_user: dict = Depends(get_current_user)):
+    """List all users with access to a dashboard."""
+    from web.dashboard_permissions import list_dashboard_users as list_users, can_view_dashboard
+
+    # Check if user can view dashboard
+    if not can_view_dashboard(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to view this dashboard")
+
+    users = list_users(dashboard_id)
+    return {"success": True, "users": users}
+
+@app.get("/api/permissions/summary")
+async def get_permissions_summary(current_user: dict = Depends(require_role("admin"))):
+    """Get summary of dashboard permissions (admin only)."""
+    from web.dashboard_permissions import get_permission_summary
+    summary = get_permission_summary()
+    return {"success": True, "summary": summary}
 
 # ==================== SCHEDULED EXPORTS APIS ====================
 
