@@ -2969,6 +2969,124 @@ async def clear_webhook_history(current_user: dict = Depends(require_role("admin
     return {"success": success, "message": "History cleared" if success else "Failed to clear history"}
 
 
+# ==================== BRAND CUSTOMIZATION APIS ====================
+
+@app.get("/api/brand/config")
+async def get_brand_config(current_user: dict = Depends(get_current_user)):
+    """Get brand configuration."""
+    from web.brand_customization import load_config
+    config = load_config()
+    return {"success": True, "config": config}
+
+
+@app.post("/api/brand/config")
+async def update_brand_config(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update brand configuration (admin only)."""
+    from web.brand_customization import load_config, save_config
+    data = await request.json()
+
+    config = load_config()
+
+    # Update allowed fields
+    allowed_fields = [
+        "company_name", "app_title", "footer_text", "show_footer",
+        "login_message", "enable_custom_theme", "custom_css",
+        "primary_color", "secondary_color", "accent_color",
+        "success_color", "warning_color", "error_color",
+        "sidebar_bg", "panel_bg", "border_color"
+    ]
+
+    for field in allowed_fields:
+        if field in data:
+            config[field] = data[field]
+
+    from web.brand_customization import save_config
+    if save_config(config):
+        return {"success": True, "config": config}
+    else:
+        return {"success": False, "error": "Failed to save configuration"}
+
+
+@app.post("/api/brand/logo/upload")
+async def upload_logo(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Upload logo image (admin only)."""
+    from web.brand_customization import save_logo
+    data = await request.json()
+
+    logo_type = data.get("logo_type", "light")  # light, dark, or favicon
+    image_data = data.get("image_data", "")
+
+    if not image_data:
+        return {"success": False, "error": "No image data provided"}
+
+    result = save_logo(image_data, logo_type)
+    return result
+
+
+@app.delete("/api/brand/logo/{logo_type}")
+async def delete_logo_endpoint(logo_type: str, current_user: dict = Depends(require_role("admin"))):
+    """Delete logo (admin only)."""
+    from web.brand_customization import delete_logo
+
+    if logo_type not in ["light", "dark", "favicon"]:
+        return {"success": False, "error": "Invalid logo type"}
+
+    result = delete_logo(logo_type)
+    return result
+
+
+@app.get("/api/brand/assets/{filename}")
+async def get_brand_asset(filename: str):
+    """Serve brand asset files."""
+    from web.brand_customization import get_asset_path
+    from fastapi.responses import FileResponse
+
+    filepath = get_asset_path(filename)
+    if filepath:
+        # Determine media type from extension
+        media_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".ico": "image/x-icon"
+        }
+
+        ext = os.path.splitext(filename)[1].lower()
+        media_type = media_types.get(ext, "application/octet-stream")
+
+        return FileResponse(filepath, media_type=media_type)
+    else:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+
+@app.post("/api/brand/theme/colors")
+async def update_theme_colors(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update theme colors (admin only)."""
+    from web.brand_customization import update_theme_colors
+    data = await request.json()
+
+    result = update_theme_colors(data)
+    return result
+
+
+@app.post("/api/brand/reset")
+async def reset_brand_config(current_user: dict = Depends(require_role("admin"))):
+    """Reset brand configuration to defaults (admin only)."""
+    from web.brand_customization import reset_to_defaults
+    result = reset_to_defaults()
+    return result
+
+
+@app.get("/api/brand/css")
+async def get_brand_css():
+    """Get custom CSS variables for branding."""
+    from web.brand_customization import get_css_variables
+    css = get_css_variables()
+    return Response(content=css, media_type="text/css")
+
+
 # ==================== INCREMENTAL REFRESH APIS ====================
 
 @app.get("/api/incremental/watermarks/{widget_id}")
