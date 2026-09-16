@@ -228,6 +228,35 @@ def execute_scheduled_export(schedule_id: str):
         schedule["last_run_files"] = len(exported_files)
         schedule["last_export_dir"] = export_dir
 
+        # Send email if enabled
+        if schedule.get("email_enabled") and schedule.get("email_recipients"):
+            try:
+                from web.email_reports import send_dashboard_report
+
+                email_result = send_dashboard_report(
+                    dashboard_id=dashboard_id,
+                    dashboard_name=dashboard.get("name", "Dashboard"),
+                    recipients=schedule["email_recipients"],
+                    include_attachments=True,
+                    attachment_format=export_format,
+                    export_dir=export_dir,
+                    custom_message=schedule.get("email_message"),
+                    cc=schedule.get("email_cc")
+                )
+
+                if email_result.get("success"):
+                    schedule["last_email_status"] = "sent"
+                    print(f"Email sent successfully for schedule {schedule_id}")
+                else:
+                    schedule["last_email_status"] = "failed"
+                    schedule["last_email_error"] = email_result.get("error", "Unknown error")
+                    print(f"Failed to send email for schedule {schedule_id}: {email_result.get('error')}")
+
+            except Exception as e:
+                schedule["last_email_status"] = "error"
+                schedule["last_email_error"] = str(e)
+                print(f"Error sending email for schedule {schedule_id}: {e}")
+
         # Update next run time
         if scheduler:
             job = scheduler.get_job(schedule_id)
@@ -286,7 +315,11 @@ def create_schedule(
     day_of_week: int = 0,
     day_of_month: int = 1,
     cron_expression: Optional[str] = None,
-    enabled: bool = True
+    enabled: bool = True,
+    email_enabled: bool = False,
+    email_recipients: Optional[List[str]] = None,
+    email_cc: Optional[List[str]] = None,
+    email_message: Optional[str] = None
 ) -> str:
     """Create a new scheduled export."""
     load_schedules()
@@ -308,6 +341,10 @@ def create_schedule(
         "day_of_week": day_of_week,
         "day_of_month": day_of_month,
         "cron_expression": cron_expression,
+        "email_enabled": email_enabled,
+        "email_recipients": email_recipients or [],
+        "email_cc": email_cc or [],
+        "email_message": email_message,
         "last_run": None,
         "last_run_status": None,
         "last_run_files": 0,
@@ -352,7 +389,11 @@ def update_schedule(
     minute: Optional[int] = None,
     day_of_week: Optional[int] = None,
     day_of_month: Optional[int] = None,
-    cron_expression: Optional[str] = None
+    cron_expression: Optional[str] = None,
+    email_enabled: Optional[bool] = None,
+    email_recipients: Optional[List[str]] = None,
+    email_cc: Optional[List[str]] = None,
+    email_message: Optional[str] = None
 ) -> bool:
     """Update a scheduled export."""
     load_schedules()
@@ -380,6 +421,14 @@ def update_schedule(
         schedule["day_of_month"] = day_of_month
     if cron_expression is not None:
         schedule["cron_expression"] = cron_expression
+    if email_enabled is not None:
+        schedule["email_enabled"] = email_enabled
+    if email_recipients is not None:
+        schedule["email_recipients"] = email_recipients
+    if email_cc is not None:
+        schedule["email_cc"] = email_cc
+    if email_message is not None:
+        schedule["email_message"] = email_message
 
     if enabled is not None:
         schedule["enabled"] = enabled

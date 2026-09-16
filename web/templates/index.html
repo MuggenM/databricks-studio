@@ -4385,6 +4385,12 @@
               <span>Schedule</span>
             </button>
 
+            <!-- Email Dashboard Button -->
+            <button @click="showEmailDashboardModal = true" class="px-3 py-1.5 bg-white hover:bg-slate-50 dark:bg-dbx-panel dark:hover:bg-dbx-hover text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition border border-slate-200 dark:border-dbx-border">
+              <i class="ph ph-envelope text-xs"></i>
+              <span>Email</span>
+            </button>
+
             <button @click="openAddWidgetModal()" class="px-3 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
               <i class="ph ph-plus text-xs"></i>
               <span>Add Widget</span>
@@ -7959,6 +7965,29 @@
           <input type="checkbox" x-model="newSchedule.enabled" id="scheduleEnabled" class="w-4 h-4 bg-slate-900 border border-dbx-border rounded focus:ring-indigo-500">
           <label for="scheduleEnabled" class="text-xs text-slate-300">Enable immediately</label>
         </div>
+
+        <!-- Email Delivery Options -->
+        <div class="border-t border-dbx-border pt-3 space-y-3">
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" x-model="newSchedule.email_enabled" id="scheduleEmailEnabled" class="w-4 h-4 bg-slate-900 border border-dbx-border rounded focus:ring-indigo-500">
+            <label for="scheduleEmailEnabled" class="text-xs font-semibold text-slate-300">📧 Email reports automatically</label>
+          </div>
+
+          <div x-show="newSchedule.email_enabled" class="space-y-2 pl-6">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Recipients (comma-separated)</label>
+              <input type="text" x-model="newSchedule.email_recipients" placeholder="user@example.com, team@company.com" class="w-full bg-slate-900 border border-dbx-border rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">CC (optional)</label>
+              <input type="text" x-model="newSchedule.email_cc" placeholder="manager@company.com" class="w-full bg-slate-900 border border-dbx-border rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Custom message (optional)</label>
+              <textarea x-model="newSchedule.email_message" rows="2" placeholder="Add a note..." class="w-full bg-slate-900 border border-dbx-border rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="flex items-center justify-end space-x-3 pt-3 border-t border-dbx-border">
@@ -7968,6 +7997,61 @@
         <button @click="submitCreateSchedule()" type="button" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition">
           <i class="ph ph-check text-xs"></i>
           <span>Create Schedule</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= EMAIL DASHBOARD MODAL ================= -->
+  <div x-show="showEmailDashboardModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showEmailDashboardModal = false">
+    <div class="bg-dbx-panel border border-dbx-border rounded-xl w-full max-w-lg shadow-2xl p-6 space-y-4" @click.outside="showEmailDashboardModal = false">
+      <div class="flex items-center justify-between border-b border-dbx-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+          <i class="ph ph-envelope text-indigo-400 text-lg"></i>
+          <span>Email Dashboard Report</span>
+        </h3>
+        <button @click="showEmailDashboardModal = false" class="text-slate-400 hover:text-white text-sm">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Recipients (comma-separated emails)</label>
+          <input type="text" x-model="emailDashboardForm.recipients" placeholder="user@example.com, team@company.com" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">CC (optional)</label>
+          <input type="text" x-model="emailDashboardForm.cc" placeholder="manager@company.com" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Custom Message (optional)</label>
+          <textarea x-model="emailDashboardForm.message" rows="3" placeholder="Add a personal message to the email..." class="w-full bg-slate-900 border border-dbx-border rounded p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <input type="checkbox" x-model="emailDashboardForm.include_attachments" id="includeAttachments" class="w-4 h-4 bg-slate-900 border border-dbx-border rounded focus:ring-indigo-500">
+          <label for="includeAttachments" class="text-xs text-slate-300">Include data attachments</label>
+        </div>
+
+        <div x-show="emailDashboardForm.include_attachments">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Attachment Format</label>
+          <select x-model="emailDashboardForm.format" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            <option value="csv">CSV</option>
+            <option value="parquet">Parquet</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-dbx-border">
+        <button @click="showEmailDashboardModal = false" type="button" class="px-3 py-1.5 bg-slate-900 hover:bg-dbx-hover border border-dbx-border text-slate-300 text-xs rounded transition">
+          Cancel
+        </button>
+        <button @click="submitEmailDashboard()" type="button" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition">
+          <i class="ph ph-paper-plane-tilt text-xs"></i>
+          <span>Send Email</span>
         </button>
       </div>
     </div>
@@ -11899,6 +11983,14 @@
         showScheduledExportsModal: false,
         scheduledExports: [],
         showCreateScheduleModal: false,
+        showEmailDashboardModal: false,
+        emailDashboardForm: {
+          recipients: '',
+          cc: '',
+          message: '',
+          include_attachments: true,
+          format: 'csv'
+        },
         newSchedule: {
           name: '',
           frequency: 'daily',
@@ -11908,7 +12000,11 @@
           day_of_week: 0,
           day_of_month: 1,
           widget_ids: [],
-          enabled: true
+          enabled: true,
+          email_enabled: false,
+          email_recipients: '',
+          email_cc: '',
+          email_message: ''
         },
         widgetTesting: false,
         widgetTestResult: null,
@@ -15034,7 +15130,17 @@
               day_of_week: this.newSchedule.day_of_week,
               day_of_month: this.newSchedule.day_of_month,
               widget_ids: this.newSchedule.widget_ids,
-              enabled: this.newSchedule.enabled
+              enabled: this.newSchedule.enabled,
+              email_enabled: this.newSchedule.email_enabled,
+              email_recipients: this.newSchedule.email_enabled && this.newSchedule.email_recipients
+                ? this.newSchedule.email_recipients.split(',').map(e => e.trim()).filter(e => e)
+                : null,
+              email_cc: this.newSchedule.email_enabled && this.newSchedule.email_cc
+                ? this.newSchedule.email_cc.split(',').map(e => e.trim()).filter(e => e)
+                : null,
+              email_message: this.newSchedule.email_enabled && this.newSchedule.email_message
+                ? this.newSchedule.email_message
+                : null
             };
 
             const res = await fetch('/api/schedules', {
@@ -15112,6 +15218,57 @@
             }
           } catch (e) {
             alert('Error deleting schedule: ' + e.message);
+          }
+        },
+
+        // ==================== EMAIL REPORTS ====================
+
+        async submitEmailDashboard() {
+          if (!this.emailDashboardForm.recipients) {
+            alert('Please enter at least one recipient email address');
+            return;
+          }
+
+          if (!this.selectedDashboardId) {
+            alert('Please select a dashboard first');
+            return;
+          }
+
+          try {
+            const recipients = this.emailDashboardForm.recipients.split(',').map(e => e.trim()).filter(e => e);
+            const cc = this.emailDashboardForm.cc ? this.emailDashboardForm.cc.split(',').map(e => e.trim()).filter(e => e) : null;
+
+            const payload = {
+              recipients: recipients,
+              include_attachments: this.emailDashboardForm.include_attachments,
+              attachment_format: this.emailDashboardForm.format,
+              custom_message: this.emailDashboardForm.message || null,
+              cc: cc
+            };
+
+            const res = await fetch(`/api/dashboards/${this.selectedDashboardId}/email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+              alert('✅ Email sent successfully!');
+              this.showEmailDashboardModal = false;
+              // Reset form
+              this.emailDashboardForm = {
+                recipients: '',
+                cc: '',
+                message: '',
+                include_attachments: true,
+                format: 'csv'
+              };
+            } else {
+              alert('Failed to send email: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error sending email: ' + e.message);
           }
         },
 

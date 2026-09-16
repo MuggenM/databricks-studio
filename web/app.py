@@ -2311,6 +2311,10 @@ async def create_schedule(
     day_of_month: int = 1,
     cron_expression: Optional[str] = None,
     enabled: bool = True,
+    email_enabled: bool = False,
+    email_recipients: Optional[List[str]] = None,
+    email_cc: Optional[List[str]] = None,
+    email_message: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new scheduled export."""
@@ -2327,7 +2331,11 @@ async def create_schedule(
         day_of_week=day_of_week,
         day_of_month=day_of_month,
         cron_expression=cron_expression,
-        enabled=enabled
+        enabled=enabled,
+        email_enabled=email_enabled,
+        email_recipients=email_recipients,
+        email_cc=email_cc,
+        email_message=email_message
     )
     return {"success": True, "schedule_id": schedule_id}
 
@@ -2344,6 +2352,10 @@ async def update_schedule(
     day_of_week: Optional[int] = None,
     day_of_month: Optional[int] = None,
     cron_expression: Optional[str] = None,
+    email_enabled: Optional[bool] = None,
+    email_recipients: Optional[List[str]] = None,
+    email_cc: Optional[List[str]] = None,
+    email_message: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a scheduled export."""
@@ -2359,7 +2371,11 @@ async def update_schedule(
         minute=minute,
         day_of_week=day_of_week,
         day_of_month=day_of_month,
-        cron_expression=cron_expression
+        cron_expression=cron_expression,
+        email_enabled=email_enabled,
+        email_recipients=email_recipients,
+        email_cc=email_cc,
+        email_message=email_message
     )
     if not success:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -2388,6 +2404,109 @@ async def get_schedule_history(schedule_id: str, limit: int = 10, current_user: 
     """Get export history for a schedule."""
     from web.scheduled_exports import get_export_history
     history = get_export_history(schedule_id, limit)
+    return {"success": True, "history": history}
+
+# ==================== EMAIL REPORTS APIS ====================
+
+@app.get("/api/email/config")
+async def get_email_config(current_user: dict = Depends(require_role("admin"))):
+    """Get email configuration (admin only)."""
+    from web.email_reports import get_email_config
+    config = get_email_config()
+    return {"success": True, "config": config}
+
+@app.post("/api/email/config")
+async def update_email_config(
+    smtp_server: Optional[str] = None,
+    smtp_port: Optional[int] = None,
+    use_tls: Optional[bool] = None,
+    sender_email: Optional[str] = None,
+    sender_password: Optional[str] = None,
+    sender_name: Optional[str] = None,
+    enabled: Optional[bool] = None,
+    current_user: dict = Depends(require_role("admin"))
+):
+    """Update email configuration (admin only)."""
+    from web.email_reports import update_email_config
+    success = update_email_config(
+        smtp_server=smtp_server,
+        smtp_port=smtp_port,
+        use_tls=use_tls,
+        sender_email=sender_email,
+        sender_password=sender_password,
+        sender_name=sender_name,
+        enabled=enabled
+    )
+    return {"success": success, "message": "Email configuration updated"}
+
+@app.post("/api/email/test")
+async def test_email_connection(current_user: dict = Depends(require_role("admin"))):
+    """Test email connection (admin only)."""
+    from web.email_reports import test_email_connection
+    result = test_email_connection()
+    return result
+
+@app.post("/api/email/send")
+async def send_email_report(
+    recipients: List[str],
+    subject: str,
+    body: str,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Send an email."""
+    from web.email_reports import send_email
+    result = send_email(
+        recipients=recipients,
+        subject=subject,
+        body_html=body,
+        cc=cc,
+        bcc=bcc
+    )
+    return result
+
+@app.post("/api/dashboards/{dashboard_id}/email")
+async def email_dashboard_report(
+    dashboard_id: str,
+    recipients: List[str],
+    include_attachments: bool = True,
+    attachment_format: str = "csv",
+    custom_message: Optional[str] = None,
+    cc: Optional[List[str]] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Email a dashboard report."""
+    from web.email_reports import send_dashboard_report
+    from web.dashboards import load_dashboards_store
+
+    # Get dashboard name
+    dashboards = load_dashboards_store()
+    dashboard = None
+    for d in dashboards:
+        if d["id"] == dashboard_id:
+            dashboard = d
+            break
+
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    result = send_dashboard_report(
+        dashboard_id=dashboard_id,
+        dashboard_name=dashboard.get("name", "Dashboard"),
+        recipients=recipients,
+        include_attachments=include_attachments,
+        attachment_format=attachment_format,
+        custom_message=custom_message,
+        cc=cc
+    )
+    return result
+
+@app.get("/api/email/history")
+async def get_email_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
+    """Get email send history."""
+    from web.email_reports import get_email_history
+    history = get_email_history(limit)
     return {"success": True, "history": history}
 
 class PreviewWidgetRequest(BaseModel):
