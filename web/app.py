@@ -2539,6 +2539,142 @@ async def get_incremental_stats(current_user: dict = Depends(get_current_user)):
     stats = get_watermark_stats()
     return {"success": True, "stats": stats}
 
+# ==================== WIDGET EXPORT APIS ====================
+
+@app.post("/api/widgets/{widget_id}/export/csv")
+async def export_widget_as_csv(
+    widget_id: str,
+    widget_title: str,
+    rows: List[Dict[str, Any]],
+    current_user: dict = Depends(get_current_user)
+):
+    """Export widget data as CSV."""
+    from web.widget_export import export_widget_csv
+    result = export_widget_csv(widget_id, widget_title, rows)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="text/csv"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.post("/api/widgets/{widget_id}/export/parquet")
+async def export_widget_as_parquet(
+    widget_id: str,
+    widget_title: str,
+    rows: List[Dict[str, Any]],
+    current_user: dict = Depends(get_current_user)
+):
+    """Export widget data as Parquet."""
+    from web.widget_export import export_widget_parquet
+    result = export_widget_parquet(widget_id, widget_title, rows)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="application/octet-stream"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.post("/api/widgets/{widget_id}/export/json")
+async def export_widget_as_json(
+    widget_id: str,
+    widget_title: str,
+    rows: List[Dict[str, Any]],
+    current_user: dict = Depends(get_current_user)
+):
+    """Export widget data as JSON."""
+    from web.widget_export import export_widget_json
+    result = export_widget_json(widget_id, widget_title, rows)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="application/json"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.post("/api/widgets/{widget_id}/export/excel")
+async def export_widget_as_excel(
+    widget_id: str,
+    widget_title: str,
+    rows: List[Dict[str, Any]],
+    current_user: dict = Depends(get_current_user)
+):
+    """Export widget data as Excel."""
+    from web.widget_export import export_widget_excel
+    result = export_widget_excel(widget_id, widget_title, rows)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.post("/api/widgets/{widget_id}/export/png")
+async def export_chart_as_png(
+    widget_id: str,
+    widget_title: str,
+    image_data: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Export chart as PNG."""
+    from web.widget_export import export_chart_png
+    result = export_chart_png(widget_id, widget_title, image_data)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="image/png"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.post("/api/widgets/{widget_id}/export/svg")
+async def export_chart_as_svg(
+    widget_id: str,
+    widget_title: str,
+    svg_content: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Export chart as SVG."""
+    from web.widget_export import export_chart_svg
+    result = export_chart_svg(widget_id, widget_title, svg_content)
+    if result["success"]:
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=result["filepath"],
+            filename=result["filename"],
+            media_type="image/svg+xml"
+        )
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Export failed"))
+
+@app.get("/api/widgets/exports/history")
+async def get_widget_export_history(limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """Get widget export history."""
+    from web.widget_export import get_export_history
+    history = get_export_history(limit)
+    return {"success": True, "history": history}
+
+@app.post("/api/widgets/exports/cleanup")
+async def cleanup_widget_exports(days: int = 7, current_user: dict = Depends(require_role("admin"))):
+    """Cleanup old widget exports (admin only)."""
+    from web.widget_export import cleanup_old_exports
+    result = cleanup_old_exports(days)
+    return result
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 

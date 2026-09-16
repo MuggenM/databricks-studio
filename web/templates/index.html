@@ -4504,19 +4504,31 @@
                       <button @click="exportOpen = !exportOpen" class="text-slate-500 hover:text-blue-400 p-1 rounded transition" title="Export Data">
                         <i class="ph ph-download text-xs"></i>
                       </button>
-                      <div x-show="exportOpen" @click.away="exportOpen = false" class="absolute right-0 mt-1 w-32 bg-slate-900 border border-dbx-border rounded-lg shadow-xl z-50 py-1">
+                      <div x-show="exportOpen" @click.away="exportOpen = false" class="absolute right-0 mt-1 w-36 bg-slate-900 border border-dbx-border rounded-lg shadow-xl z-50 py-1">
+                        <div class="px-2 py-1 text-[10px] text-slate-500 uppercase font-semibold">Data Formats</div>
                         <button @click="exportWidget(widget.id, 'csv'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
                           <i class="ph ph-file-csv text-xs"></i>
                           <span>CSV</span>
+                        </button>
+                        <button @click="exportWidget(widget.id, 'excel'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
+                          <i class="ph ph-file-xls text-xs"></i>
+                          <span>Excel</span>
                         </button>
                         <button @click="exportWidget(widget.id, 'parquet'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
                           <i class="ph ph-file text-xs"></i>
                           <span>Parquet</span>
                         </button>
-                        <button x-show="!['kpi', 'big_number_trendline', 'table', 'pivot_table'].includes(widget.type)" @click="exportChartPNG(widget.id); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2 border-t border-dbx-border/50">
-                          <i class="ph ph-image text-xs"></i>
-                          <span>PNG</span>
+                        <button @click="exportWidget(widget.id, 'json'); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
+                          <i class="ph ph-brackets-curly text-xs"></i>
+                          <span>JSON</span>
                         </button>
+                        <div x-show="!['kpi', 'big_number_trendline', 'table', 'pivot_table'].includes(widget.type)" class="border-t border-dbx-border/50 mt-1 pt-1">
+                          <div class="px-2 py-1 text-[10px] text-slate-500 uppercase font-semibold">Chart Image</div>
+                          <button @click="exportChartPNG(widget.id); exportOpen = false" class="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-dbx-hover transition flex items-center space-x-2">
+                            <i class="ph ph-image text-xs"></i>
+                            <span>PNG Image</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <button @click="deleteWidget(widget.id)" class="text-slate-500 hover:text-red-400 p-1 rounded transition" title="Delete Widget">
@@ -16281,19 +16293,53 @@
 
         async exportWidget(widgetId, format) {
           try {
-            // Build URL with filter parameters
-            const params = JSON.stringify(this.activeFilters);
-            const url = `/api/dashboards/${this.selectedDashboardId}/widgets/${widgetId}/export?format=${format}&params=${encodeURIComponent(params)}`;
+            // Find the widget
+            const widget = this.currentDashboard.widgets.find(w => w.id === widgetId);
+            if (!widget || !widget.result || !widget.result.rows) {
+              alert('No data available to export');
+              return;
+            }
 
-            // Trigger download
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${widgetId}_${Date.now()}.${format}`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Prepare export data
+            const payload = {
+              widget_id: widgetId,
+              widget_title: widget.title || widgetId,
+              rows: widget.result.rows
+            };
 
-            console.log(`Exported widget ${widgetId} as ${format}`);
+            // Call export API
+            const res = await fetch(`/api/widgets/${widgetId}/export/${format}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+              // Trigger download
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+
+              // Get filename from Content-Disposition header if available
+              const contentDisposition = res.headers.get('Content-Disposition');
+              let filename = `${widget.title || widgetId}_${Date.now()}.${format}`;
+              if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?(.+)"?/);
+                if (match) filename = match[1];
+              }
+
+              link.download = filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+
+              console.log(`✅ Exported widget "${widget.title}" as ${format.toUpperCase()}`);
+            } else {
+              const error = await res.json();
+              alert('Export failed: ' + (error.detail || 'Unknown error'));
+            }
           } catch (e) {
             console.error('Failed to export widget:', e);
             alert('Export failed: ' + e.message);
