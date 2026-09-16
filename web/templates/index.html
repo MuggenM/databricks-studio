@@ -1124,7 +1124,7 @@
             <i class="ph ph-cpu text-base text-amber-700 dark:text-amber-400"></i>
             <span>Compute & Engine</span>
           </button>
-          <button x-show="currentUser?.role === 'admin'" @click="currentView = 'settings'; loadEmailConfig(); loadSlackConfig();" :class="currentView === 'settings' ? 'bg-slate-100 dark:bg-dbx-hover text-slate-900 dark:text-white border-l-2 border-slate-600 dark:border-slate-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dbx-panel dark:hover:text-slate-200'" class="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-r text-xs transition text-left">
+          <button x-show="currentUser?.role === 'admin'" @click="currentView = 'settings'; loadEmailConfig(); loadSlackConfig(); loadWebhookConfig();" :class="currentView === 'settings' ? 'bg-slate-100 dark:bg-dbx-hover text-slate-900 dark:text-white border-l-2 border-slate-600 dark:border-slate-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dbx-panel dark:hover:text-slate-200'" class="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-r text-xs transition text-left">
             <i class="ph ph-gear text-base text-slate-600 dark:text-slate-400"></i>
             <span class="flex-1">Platform Settings</span>
             <span class="text-[9px] px-1 py-0.2 bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 rounded border border-red-300/80 dark:border-red-800/80 font-mono font-semibold">ADMIN</span>
@@ -11041,6 +11041,85 @@
               </template>
             </select>
           </div>
+
+          <!-- Generic Webhooks Section -->
+          <div class="pt-4 mt-4 border-t border-slate-200 dark:border-dbx-border">
+            <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl mb-4">
+              <div class="space-y-0.5">
+                <span class="font-bold text-slate-800 dark:text-white block flex items-center">
+                  <i class="ph ph-webhooks-logo mr-2"></i>
+                  Generic Webhooks
+                </span>
+                <span class="text-[11px] text-slate-500 block">Send alerts to any HTTP endpoint (Discord, Teams, PagerDuty, etc.)</span>
+              </div>
+              <input type="checkbox" x-model="webhookConfig.enabled" id="webhooksEnabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+            </div>
+
+            <!-- Webhook List -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="block text-slate-700 dark:text-slate-300 font-semibold uppercase text-[10px]">Configured Webhooks</label>
+                <button @click="showAddGenericWebhookModal = true" type="button" class="px-2 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded transition flex items-center space-x-1">
+                  <i class="ph ph-plus text-xs"></i>
+                  <span>Add Webhook</span>
+                </button>
+              </div>
+
+              <div x-show="webhookConfig.webhooks.length === 0" class="text-center py-6 text-slate-500 text-xs">
+                No webhooks configured. Click "Add Webhook" to get started.
+              </div>
+
+              <div class="space-y-2 max-h-64 overflow-y-auto">
+                <template x-for="webhook in webhookConfig.webhooks" :key="webhook.id">
+                  <div class="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-lg">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-1">
+                          <span class="font-semibold text-slate-800 dark:text-white text-xs" x-text="webhook.name"></span>
+                          <span class="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[9px] rounded font-medium uppercase" x-text="webhook.type"></span>
+                          <span x-show="!webhook.enabled" class="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] rounded font-medium">DISABLED</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 space-y-0.5">
+                          <div x-show="webhook.description"><span class="font-medium">Description:</span> <span x-text="webhook.description"></span></div>
+                          <div class="flex items-center space-x-3">
+                            <span><span class="font-medium">Success:</span> <span x-text="webhook.success_count || 0"></span></span>
+                            <span><span class="font-medium">Failed:</span> <span x-text="webhook.failure_count || 0"></span></span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flex items-center space-x-1 ml-2">
+                        <button @click="testGenericWebhook(webhook.id)" type="button" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition" title="Test Webhook">
+                          <i class="ph ph-paper-plane-tilt text-sm"></i>
+                        </button>
+                        <button @click="viewWebhookHistory(webhook.id)" type="button" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition" title="View History">
+                          <i class="ph ph-clock-counter-clockwise text-sm"></i>
+                        </button>
+                        <button @click="deleteGenericWebhook(webhook.id)" type="button" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition" title="Delete Webhook">
+                          <i class="ph ph-trash text-sm"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Global Settings -->
+            <div x-show="webhookConfig.webhooks.length > 0" class="mt-4 grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Max Retries</label>
+                <input type="number" min="0" max="10" x-model.number="webhookConfig.max_retries" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Retry Delay (s)</label>
+                <input type="number" min="1" max="60" x-model.number="webhookConfig.retry_delay" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Timeout (s)</label>
+                <input type="number" min="5" max="120" x-model.number="webhookConfig.timeout" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-dbx-border">
@@ -11091,6 +11170,71 @@
 
         <div class="flex items-center justify-end space-x-2 pt-2">
           <button @click="showAddWebhookModal = false" type="button" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 rounded-lg transition font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow flex items-center space-x-1.5 transition">
+            <i class="ph ph-plus"></i>
+            <span>Add Webhook</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Generic Webhook -->
+  <div x-show="showAddGenericWebhookModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @keydown.escape.window="showAddGenericWebhookModal = false">
+    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" @click.outside="showAddGenericWebhookModal = false">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-dbx-border pb-3 sticky top-0 bg-white dark:bg-dbx-panel">
+        <div class="flex items-center space-x-2">
+          <i class="ph ph-webhooks-logo text-lg text-slate-700 dark:text-slate-300"></i>
+          <h4 class="font-bold text-slate-900 dark:text-white text-sm">Add Generic Webhook</h4>
+        </div>
+        <button @click="showAddGenericWebhookModal = false" class="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="createGenericWebhook()" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Webhook Name</label>
+          <input type="text" x-model="newGenericWebhook.name" required placeholder="Discord Production Alerts" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Webhook Type</label>
+          <select x-model="newGenericWebhook.type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+            <option value="generic">Generic JSON</option>
+            <option value="discord">Discord</option>
+            <option value="teams">Microsoft Teams</option>
+            <option value="pagerduty">PagerDuty</option>
+          </select>
+          <p class="text-[10px] text-slate-500 mt-1">Choose the platform for optimized payload format</p>
+        </div>
+
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Webhook URL</label>
+          <input type="url" x-model="newGenericWebhook.url" required placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Authentication</label>
+          <select x-model="newGenericWebhook.auth_type" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+            <option value="none">None</option>
+            <option value="bearer">Bearer Token</option>
+            <option value="api_key">API Key (X-API-Key header)</option>
+          </select>
+        </div>
+
+        <div x-show="newGenericWebhook.auth_type !== 'none'">
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Auth Token / API Key</label>
+          <input type="password" x-model="newGenericWebhook.auth_token" :required="newGenericWebhook.auth_type !== 'none'" placeholder="Enter token or API key" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Description (Optional)</label>
+          <textarea x-model="newGenericWebhook.description" rows="2" placeholder="Production alerts for Discord #monitoring channel" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button @click="showAddGenericWebhookModal = false" type="button" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 rounded-lg transition font-medium">Cancel</button>
           <button type="submit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow flex items-center space-x-1.5 transition">
             <i class="ph ph-plus"></i>
             <span>Add Webhook</span>
@@ -11636,6 +11780,22 @@
           name: '',
           webhook_url: '',
           channel: '#general',
+          description: ''
+        },
+        webhookConfig: {
+          enabled: false,
+          webhooks: [],
+          max_retries: 3,
+          retry_delay: 2,
+          timeout: 30
+        },
+        showAddGenericWebhookModal: false,
+        newGenericWebhook: {
+          name: '',
+          url: '',
+          type: 'generic',
+          auth_type: 'none',
+          auth_token: '',
           description: ''
         },
         isLoadingSettings: false,
@@ -13099,6 +13259,110 @@
           }
         },
 
+        // Generic Webhook Functions
+        async loadWebhookConfig() {
+          try {
+            const res = await fetch('/api/webhooks/config');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.config) {
+                this.webhookConfig = { ...this.webhookConfig, ...data.config };
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load webhook config:', e);
+          }
+        },
+
+        async saveWebhookConfig() {
+          const res = await fetch('/api/webhooks/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.webhookConfig)
+          });
+          return res.ok;
+        },
+
+        async createGenericWebhook() {
+          try {
+            const res = await fetch('/api/webhooks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.newGenericWebhook)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              this.showToast('Webhook added successfully', 'success');
+              this.showAddGenericWebhookModal = false;
+              this.newGenericWebhook = { name: '', url: '', type: 'generic', auth_type: 'none', auth_token: '', description: '' };
+              await this.loadWebhookConfig();
+            } else {
+              alert('❌ Failed to add webhook:\n\n' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('❌ Error adding webhook:\n\n' + e.message);
+          }
+        },
+
+        async deleteGenericWebhook(webhookId) {
+          if (!confirm('Are you sure you want to delete this webhook?')) {
+            return;
+          }
+
+          try {
+            const res = await fetch(`/api/webhooks/${webhookId}`, {
+              method: 'DELETE'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              this.showToast('Webhook deleted successfully', 'success');
+              await this.loadWebhookConfig();
+            } else {
+              alert('❌ Failed to delete webhook:\n\n' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('❌ Error deleting webhook:\n\n' + e.message);
+          }
+        },
+
+        async testGenericWebhook(webhookId) {
+          try {
+            const res = await fetch(`/api/webhooks/${webhookId}/test`, {
+              method: 'POST'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              alert(`✅ Test notification sent!\n\nStatus: ${data.status_code}\nDuration: ${data.duration}s\nAttempts: ${data.attempt}`);
+            } else {
+              alert('❌ Test failed:\n\n' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('❌ Error testing webhook:\n\n' + e.message);
+          }
+        },
+
+        async viewWebhookHistory(webhookId) {
+          try {
+            const res = await fetch('/api/webhooks/history?limit=50');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) {
+                const webhookHistory = data.history.filter(h => h.webhook_id === webhookId);
+                const historyText = webhookHistory.slice(0, 10).map(h =>
+                  `${h.timestamp}\n${h.success ? '✅' : '❌'} ${h.title}\nStatus: ${h.status_code} | Duration: ${h.duration}s${h.error ? '\nError: ' + h.error : ''}`
+                ).join('\n\n');
+
+                alert(`📊 Recent Webhook History (${webhookHistory.length} total)\n\n${historyText || 'No history yet'}`);
+              }
+            }
+          } catch (e) {
+            alert('❌ Error loading history:\n\n' + e.message);
+          }
+        },
+
         async saveSettings() {
           this.isSavingSettings = true;
           try {
@@ -13125,6 +13389,13 @@
             const res3 = await this.saveSlackConfig();
             if (!res3) {
               this.showToast('Platform and email saved, but Slack config failed', 'warning');
+              return;
+            }
+
+            // Save webhook config
+            const res4 = await this.saveWebhookConfig();
+            if (!res4) {
+              this.showToast('Settings saved, but webhook config failed', 'warning');
               return;
             }
 

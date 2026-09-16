@@ -2806,6 +2806,169 @@ async def send_slack_alert(request: Request, current_user: dict = Depends(get_cu
     return result
 
 
+# ==================== GENERIC WEBHOOK APIS ====================
+
+@app.get("/api/webhooks/config")
+async def get_webhook_config(current_user: dict = Depends(require_role("admin"))):
+    """Get webhook configuration (admin only)."""
+    from web.webhook_alerts import load_config
+    config = load_config()
+
+    # Mask webhook URLs and auth tokens for security
+    safe_config = config.copy()
+    safe_webhooks = []
+    for webhook in config.get("webhooks", []):
+        safe_webhook = webhook.copy()
+        if "url" in safe_webhook:
+            url = safe_webhook["url"]
+            if len(url) > 20:
+                safe_webhook["url"] = url[:15] + "..." + url[-10:]
+            else:
+                safe_webhook["url"] = "***"
+        if "auth_token" in safe_webhook and safe_webhook["auth_token"]:
+            safe_webhook["auth_token"] = "***MASKED***"
+        safe_webhooks.append(safe_webhook)
+    safe_config["webhooks"] = safe_webhooks
+
+    return {"success": True, "config": safe_config}
+
+
+@app.post("/api/webhooks/config")
+async def update_webhook_config(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update webhook configuration (admin only)."""
+    from web.webhook_alerts import load_config, save_config
+    data = await request.json()
+
+    config = load_config()
+
+    # Update allowed fields
+    if "enabled" in data:
+        config["enabled"] = data["enabled"]
+    if "max_retries" in data:
+        config["max_retries"] = data["max_retries"]
+    if "retry_delay" in data:
+        config["retry_delay"] = data["retry_delay"]
+    if "timeout" in data:
+        config["timeout"] = data["timeout"]
+
+    from web.webhook_alerts import save_config
+    if save_config(config):
+        return {"success": True, "message": "Webhook configuration updated"}
+    else:
+        return {"success": False, "error": "Failed to save configuration"}
+
+
+@app.get("/api/webhooks/types")
+async def get_webhook_types(current_user: dict = Depends(get_current_user)):
+    """Get available webhook types."""
+    from web.webhook_alerts import get_webhook_types
+    types = get_webhook_types()
+    return {"success": True, "types": types}
+
+
+@app.post("/api/webhooks")
+async def create_webhook(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Add a new webhook (admin only)."""
+    from web.webhook_alerts import add_webhook
+    data = await request.json()
+
+    result = add_webhook(
+        name=data.get("name", ""),
+        url=data.get("url", ""),
+        webhook_type=data.get("type", "generic"),
+        custom_headers=data.get("custom_headers"),
+        custom_template=data.get("custom_template"),
+        description=data.get("description", ""),
+        auth_type=data.get("auth_type", "none"),
+        auth_token=data.get("auth_token", "")
+    )
+
+    return result
+
+
+@app.put("/api/webhooks/{webhook_id}")
+async def update_webhook_endpoint(webhook_id: str, request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update a webhook (admin only)."""
+    from web.webhook_alerts import update_webhook
+    data = await request.json()
+
+    result = update_webhook(webhook_id, data)
+    return result
+
+
+@app.delete("/api/webhooks/{webhook_id}")
+async def delete_webhook(webhook_id: str, current_user: dict = Depends(require_role("admin"))):
+    """Delete a webhook (admin only)."""
+    from web.webhook_alerts import remove_webhook
+    result = remove_webhook(webhook_id)
+    return result
+
+
+@app.get("/api/webhooks")
+async def list_webhooks(current_user: dict = Depends(get_current_user)):
+    """List all webhooks."""
+    from web.webhook_alerts import get_webhooks
+    webhooks = get_webhooks()
+
+    # Mask URLs and auth tokens for security
+    safe_webhooks = []
+    for webhook in webhooks:
+        safe_webhook = webhook.copy()
+        if "url" in safe_webhook:
+            url = safe_webhook["url"]
+            if len(url) > 20:
+                safe_webhook["url"] = url[:15] + "..." + url[-10:]
+            else:
+                safe_webhook["url"] = "***"
+        if "auth_token" in safe_webhook and safe_webhook["auth_token"]:
+            safe_webhook["auth_token"] = "***MASKED***"
+        safe_webhooks.append(safe_webhook)
+
+    return {"success": True, "webhooks": safe_webhooks}
+
+
+@app.post("/api/webhooks/{webhook_id}/test")
+async def test_webhook_endpoint(webhook_id: str, current_user: dict = Depends(require_role("admin"))):
+    """Test a webhook (admin only)."""
+    from web.webhook_alerts import test_webhook
+    result = test_webhook(webhook_id)
+    return result
+
+
+@app.post("/api/webhooks/{webhook_id}/send")
+async def send_webhook_notification(webhook_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Send a webhook notification."""
+    from web.webhook_alerts import send_webhook
+    data = await request.json()
+
+    result = send_webhook(
+        webhook_id=webhook_id,
+        title=data.get("title", ""),
+        message=data.get("message", ""),
+        data=data.get("data"),
+        severity=data.get("severity", "info"),
+        color=data.get("color")
+    )
+
+    return result
+
+
+@app.get("/api/webhooks/history")
+async def get_webhook_history(limit: int = 100, current_user: dict = Depends(get_current_user)):
+    """Get webhook execution history."""
+    from web.webhook_alerts import load_history
+    history = load_history(limit)
+    return {"success": True, "history": history}
+
+
+@app.delete("/api/webhooks/history")
+async def clear_webhook_history(current_user: dict = Depends(require_role("admin"))):
+    """Clear webhook execution history (admin only)."""
+    from web.webhook_alerts import clear_history
+    success = clear_history()
+    return {"success": success, "message": "History cleared" if success else "Failed to clear history"}
+
+
 # ==================== INCREMENTAL REFRESH APIS ====================
 
 @app.get("/api/incremental/watermarks/{widget_id}")
