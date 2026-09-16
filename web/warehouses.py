@@ -80,6 +80,9 @@ def get_default_sql_warehouses() -> List[Dict[str, Any]]:
             "is_default": True,
             "channel": "DuckDB 1.5.5",
             "query_count": 0,
+            "ray_workers": 2,
+            "min_workers": 0,
+            "max_workers": 16,
             "created_at": now_str,
             "last_active_at": now_str
         },
@@ -95,6 +98,9 @@ def get_default_sql_warehouses() -> List[Dict[str, Any]]:
             "is_default": False,
             "channel": "DuckDB 1.5.5 (Vectorized)",
             "query_count": 0,
+            "ray_workers": 1,
+            "min_workers": 0,
+            "max_workers": 16,
             "created_at": now_str,
             "last_active_at": now_str
         },
@@ -110,6 +116,9 @@ def get_default_sql_warehouses() -> List[Dict[str, Any]]:
             "is_default": False,
             "channel": "DuckDB 1.5.5",
             "query_count": 0,
+            "ray_workers": 0,
+            "min_workers": 0,
+            "max_workers": 16,
             "created_at": now_str,
             "last_active_at": now_str
         }
@@ -128,6 +137,9 @@ def load_sql_warehouses() -> List[Dict[str, Any]]:
             for w in wh_list:
                 if "endpoint" not in w or not w["endpoint"]:
                     w["endpoint"] = DEFAULT_WORKER_ENDPOINTS.get(w.get("id"), "")
+                w.setdefault("ray_workers", 2 if w.get("id") == "wh_starter" else 1)
+                w.setdefault("min_workers", 0)
+                w.setdefault("max_workers", 16)
             return wh_list
     except Exception as e:
         logger.error(f"Failed to load sql_warehouses.json: {e}")
@@ -152,7 +164,10 @@ def create_sql_warehouse(
     max_memory: Optional[str] = None,
     auto_stop_mins: int = 10,
     is_default: bool = False,
-    endpoint: Optional[str] = None
+    endpoint: Optional[str] = None,
+    ray_workers: int = 1,
+    min_workers: int = 0,
+    max_workers: int = 16
 ) -> Dict[str, Any]:
     warehouses = load_sql_warehouses()
     preset = CLUSTER_SIZES.get(cluster_size, CLUSTER_SIZES["Small"])
@@ -178,6 +193,9 @@ def create_sql_warehouse(
         "is_default": is_default,
         "channel": "DuckDB 1.5.5",
         "query_count": 0,
+        "ray_workers": int(ray_workers),
+        "min_workers": int(min_workers),
+        "max_workers": int(max_workers),
         "created_at": now_str,
         "last_active_at": now_str
     }
@@ -211,6 +229,12 @@ def update_sql_warehouse(wh_id: str, updates: Dict[str, Any]) -> Optional[Dict[s
         target["auto_stop_mins"] = int(updates["auto_stop_mins"])
     if "endpoint" in updates:
         target["endpoint"] = str(updates["endpoint"]).strip() if updates["endpoint"] else ""
+    if "ray_workers" in updates and updates["ray_workers"] is not None:
+        target["ray_workers"] = int(updates["ray_workers"])
+    if "min_workers" in updates and updates["min_workers"] is not None:
+        target["min_workers"] = int(updates["min_workers"])
+    if "max_workers" in updates and updates["max_workers"] is not None:
+        target["max_workers"] = int(updates["max_workers"])
     if "is_default" in updates and updates["is_default"]:
         for w in warehouses:
             w["is_default"] = (w["id"] == wh_id)

@@ -2021,7 +2021,7 @@
               <span class="h-2 w-2 rounded-full shrink-0" :class="activeSqlWarehouse?.state === 'RUNNING' ? 'bg-emerald-400 shadow shadow-emerald-400/50' : 'bg-slate-500'"></span>
               <select x-model="selectedSqlWarehouseId" class="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer truncate w-full" :title="activeSqlWarehouse ? activeSqlWarehouse.name + ' [' + activeSqlWarehouse.cluster_size + ' - ' + activeSqlWarehouse.threads + ' vCPU, ' + activeSqlWarehouse.max_memory + ']' : 'Select SQL Warehouse'">
                 <template x-for="wh in sqlWarehouses" :key="wh.id">
-                  <option :value="wh.id" x-text="wh.name + ' [' + wh.cluster_size + ' - ' + wh.threads + ' vCPU, ' + wh.max_memory + ']'" class="bg-slate-900 text-white"></option>
+                  <option :value="wh.id" x-text="wh.name + ' [' + wh.cluster_size + (wh.active_ray_workers ? ', ' + wh.active_ray_workers + ' Ray w' : '') + ']'" class="bg-slate-900 text-white"></option>
                 </template>
               </select>
             </div>
@@ -3503,6 +3503,7 @@
                 <th class="py-3 px-4">Warehouse Name</th>
                 <th class="py-3 px-4">State</th>
                 <th class="py-3 px-4">Cluster Size</th>
+                <th class="py-3 px-4">Elastic Scale (Ray)</th>
                 <th class="py-3 px-4">Worker Node / Endpoint</th>
                 <th class="py-3 px-4">Resources</th>
                 <th class="py-3 px-4">Auto-Stop</th>
@@ -3533,6 +3534,28 @@
                     </span>
                   </td>
                   <td class="py-3.5 px-4 font-sans font-medium text-slate-300" x-text="wh.cluster_size"></td>
+                  <td class="py-3.5 px-4 font-sans">
+                    <div class="flex items-center space-x-2">
+                      <span class="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium"
+                            :class="(wh.active_ray_workers || 0) > 0 ? 'bg-amber-950/80 text-amber-300 border border-amber-800' : 'bg-slate-900 text-slate-400 border border-slate-700'">
+                        <i class="ph ph-lightning text-amber-400 text-xs" :class="(wh.active_ray_workers || 0) > 0 ? 'animate-pulse' : ''"></i>
+                        <span x-text="(wh.active_ray_workers || 0) + ' active'"></span>
+                      </span>
+                      <div class="inline-flex items-center border border-slate-700 bg-slate-900 rounded overflow-hidden shadow-xs">
+                        <button @click.stop="scaleWarehouse(wh.id, (wh.active_ray_workers || wh.ray_workers || 1) - 1)" 
+                                :disabled="scalingWarehouseId === wh.id || (wh.active_ray_workers || wh.ray_workers || 1) <= 0"
+                                class="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold transition"
+                                title="Scale Down 1 Worker">-</button>
+                        <span class="px-2 py-0.5 text-[10px] font-mono text-white font-bold bg-slate-950/70" 
+                              x-text="(wh.active_ray_workers !== undefined ? wh.active_ray_workers : (wh.ray_workers || 1)) + ' w'"></span>
+                        <button @click.stop="scaleWarehouse(wh.id, (wh.active_ray_workers || wh.ray_workers || 1) + 1)" 
+                                :disabled="scalingWarehouseId === wh.id || (wh.active_ray_workers || wh.ray_workers || 1) >= 16"
+                                class="px-1.5 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold transition"
+                                title="Scale Up 1 Worker">+</button>
+                      </div>
+                      <i x-show="scalingWarehouseId === wh.id" class="ph ph-spinner animate-spin text-amber-400 text-xs"></i>
+                    </div>
+                  </td>
                   <td class="py-3.5 px-4 font-mono text-xs">
                     <template x-if="wh.endpoint">
                       <span class="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-mono bg-slate-900 border border-cyan-800/60 text-cyan-300">
@@ -3572,6 +3595,146 @@
               </template>
             </tbody>
           </table>
+        </div>
+
+        <!-- Ray Distributed Compute Engine (Option B: Dynamic Scaling & Partitioned Delta Scan) -->
+        <div class="bg-dbx-panel border border-dbx-border rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-3.5 border-b border-dbx-border flex items-center justify-between bg-slate-900/50">
+            <div class="flex items-center space-x-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center space-x-2">
+                <i class="ph ph-lightning text-sm text-amber-400"></i>
+                <span>Ray Distributed Compute Engine (Option B: Dynamic Scaling & Delta Scan)</span>
+              </span>
+              <span class="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-medium"
+                    :class="rayStatus.initialized ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800' : 'bg-slate-900 text-slate-400 border border-slate-700'">
+                <span class="h-1.5 w-1.5 rounded-full" :class="rayStatus.initialized ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'"></span>
+                <span x-text="rayStatus.initialized ? 'Ray v' + (rayStatus.ray_version || '2.58') + ' ACTIVE' : 'Ray STANDBY / LOCAL'"></span>
+              </span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button @click="startRayCluster()" x-show="!rayStatus.initialized" class="px-2.5 py-1 bg-amber-950 hover:bg-amber-900 text-amber-300 hover:text-white rounded text-xs transition flex items-center space-x-1 border border-amber-800">
+                <i class="ph ph-play-fill text-[10px]"></i>
+                <span>Initialize Ray</span>
+              </button>
+              <button @click="stopRayCluster()" x-show="rayStatus.initialized" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-xs transition flex items-center space-x-1 border border-slate-700">
+                <i class="ph ph-power text-[10px]"></i>
+                <span>Shutdown Ray</span>
+              </button>
+              <button @click="fetchRayStatus()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-xs transition flex items-center space-x-1 border border-slate-700">
+                <i class="ph ph-arrows-clockwise" :class="loadingRayStatus ? 'animate-spin' : ''"></i>
+                <span>Refresh Ray</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="p-5 space-y-4">
+            <!-- Ray Cluster Telemetry Metric Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div class="bg-slate-900/60 border border-dbx-border/80 rounded-lg p-3.5 space-y-1">
+                <div class="text-[10px] uppercase font-semibold text-slate-400 flex items-center justify-between">
+                  <span>Ray Head / Mode</span>
+                  <i class="ph ph-cpu text-slate-500 text-xs"></i>
+                </div>
+                <div class="text-base font-bold text-white font-mono truncate" x-text="rayStatus.address || 'Embedded'"></div>
+                <div class="text-[10px] text-slate-500 font-mono" x-text="(rayStatus.nodes_count || 1) + ' Node(s) Online'"></div>
+              </div>
+              <div class="bg-slate-900/60 border border-dbx-border/80 rounded-lg p-3.5 space-y-1">
+                <div class="text-[10px] uppercase font-semibold text-slate-400 flex items-center justify-between">
+                  <span>Worker CPUs</span>
+                  <i class="ph ph-lightning text-amber-400 text-xs"></i>
+                </div>
+                <div class="text-base font-bold text-amber-300 font-mono" x-text="(rayStatus.total_cpus || 0) + ' vCPUs'"></div>
+                <div class="text-[10px] text-slate-500">Elastic Vectorized Threads</div>
+              </div>
+              <div class="bg-slate-900/60 border border-dbx-border/80 rounded-lg p-3.5 space-y-1">
+                <div class="text-[10px] uppercase font-semibold text-slate-400 flex items-center justify-between">
+                  <span>Plasma Object Store</span>
+                  <i class="ph ph-database text-cyan-400 text-xs"></i>
+                </div>
+                <div class="text-base font-bold text-cyan-300 font-mono" x-text="(rayStatus.object_store_memory_mb || 0) + ' MB'"></div>
+                <div class="text-[10px] text-slate-500">Zero-Copy Arrow Buffers</div>
+              </div>
+              <div class="bg-slate-900/60 border border-dbx-border/80 rounded-lg p-3.5 space-y-1">
+                <div class="text-[10px] uppercase font-semibold text-slate-400 flex items-center justify-between">
+                  <span>System Memory</span>
+                  <i class="ph ph-gauge text-emerald-400 text-xs"></i>
+                </div>
+                <div class="text-base font-bold text-emerald-300 font-mono" x-text="(rayStatus.total_memory_mb || 0) + ' MB'"></div>
+                <div class="text-[10px] text-slate-500">Node Allocated RAM</div>
+              </div>
+            </div>
+
+            <!-- Active Warehouse Actor Pools List -->
+            <div class="bg-slate-950/40 border border-dbx-border/60 rounded-lg p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+                  <i class="ph ph-users-three text-amber-400"></i>
+                  <span>Warehouse Actor Pools & Distributed Partition Scans</span>
+                </span>
+                <span class="text-[11px] text-slate-400 font-sans">Sub-second dynamic scale on the fly without restarting containers</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <template x-for="wh in sqlWarehouses" :key="'pool-' + wh.id">
+                  <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 space-y-2.5">
+                    <div class="flex items-start justify-between">
+                      <div>
+                        <div class="font-bold text-white text-xs" x-text="wh.name"></div>
+                        <div class="text-[10px] font-mono text-slate-400" x-text="wh.id"></div>
+                      </div>
+                      <span class="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-mono"
+                            :class="(wh.active_ray_workers || 0) > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-slate-800 text-slate-400 border border-slate-700'">
+                        <span class="h-1 w-1 rounded-full" :class="(wh.active_ray_workers || 0) > 0 ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'"></span>
+                        <span x-text="(wh.active_ray_workers || 0) + ' Workers'"></span>
+                      </span>
+                    </div>
+
+                    <!-- Dynamic Worker Stepper -->
+                    <div class="flex items-center justify-between pt-1 border-t border-slate-800 text-xs">
+                      <span class="text-slate-400 text-[11px]">Dynamic Scale:</span>
+                      <div class="inline-flex items-center border border-slate-700 bg-slate-950 rounded overflow-hidden">
+                        <button @click="scaleWarehouse(wh.id, (wh.active_ray_workers || wh.ray_workers || 1) - 1)" 
+                                :disabled="scalingWarehouseId === wh.id || (wh.active_ray_workers || wh.ray_workers || 1) <= 0"
+                                class="px-2 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold transition">-</button>
+                        <span class="px-2.5 py-0.5 text-[11px] font-mono text-white font-bold" 
+                              x-text="(wh.active_ray_workers !== undefined ? wh.active_ray_workers : (wh.ray_workers || 1))"></span>
+                        <button @click="scaleWarehouse(wh.id, (wh.active_ray_workers || wh.ray_workers || 1) + 1)" 
+                                :disabled="scalingWarehouseId === wh.id || (wh.active_ray_workers || wh.ray_workers || 1) >= 16"
+                                class="px-2 py-0.5 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold transition">+</button>
+                      </div>
+                    </div>
+
+                    <!-- Run Distributed Delta Scan button -->
+                    <button @click="testDistributedDeltaScan(wh.id)" 
+                            :disabled="loadingDistributedScan === wh.id"
+                            class="w-full py-1 px-2 bg-slate-800 hover:bg-slate-700 border border-slate-600/80 rounded text-[11px] text-amber-300 font-medium transition flex items-center justify-center space-x-1.5 disabled:opacity-50">
+                      <i class="ph ph-lightning text-xs" :class="loadingDistributedScan === wh.id ? 'animate-spin' : ''"></i>
+                      <span x-text="loadingDistributedScan === wh.id ? 'Executing Scan...' : 'Test Distributed Delta Scan'"></span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Distributed Scan Result Banner -->
+              <div x-show="distributedScanResult" class="mt-3 bg-slate-900 border border-amber-700/60 rounded-lg p-3 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2 font-bold text-amber-300">
+                    <i class="ph ph-check-circle text-base text-emerald-400"></i>
+                    <span>Distributed Map-Reduce Scan Completed</span>
+                  </div>
+                  <button @click="distributedScanResult = null" class="text-slate-400 hover:text-white">
+                    <i class="ph ph-x"></i>
+                  </button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 font-mono">
+                  <div>Rows: <span class="text-emerald-400 font-bold" x-text="distributedScanResult?.row_count"></span></div>
+                  <div>Duration: <span class="text-cyan-400 font-bold" x-text="distributedScanResult?.duration_ms + ' ms'"></span></div>
+                  <div>Partitions Scanned: <span class="text-amber-400 font-bold" x-text="distributedScanResult?.partitions_scanned"></span></div>
+                  <div>Workers Utilized: <span class="text-purple-400 font-bold" x-text="distributedScanResult?.workers_utilized"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Clustered Compute Nodes (Docker Mesh Simulation) Panel -->
@@ -13161,6 +13324,21 @@
         selectedSqlWarehouseId: 'wh_starter',
         showWarehouseModal: false,
         warehouseEditMode: false,
+        // Ray Distributed Compute State
+        rayStatus: {
+          available: false,
+          initialized: false,
+          ray_version: '',
+          nodes_count: 0,
+          total_cpus: 0,
+          total_memory_mb: 0,
+          object_store_memory_mb: 0,
+          actor_pools: {}
+        },
+        loadingRayStatus: false,
+        scalingWarehouseId: null,
+        loadingDistributedScan: null,
+        distributedScanResult: null,
         warehouseForm: {
           id: '',
           name: '',
@@ -15615,6 +15793,7 @@
             console.error('Failed to fetch SQL warehouses:', e);
           }
           await this.fetchClusterNodes();
+          await this.fetchRayStatus();
         },
 
         async fetchClusterNodes() {
@@ -15627,6 +15806,100 @@
             console.error('Failed to fetch cluster compute nodes:', e);
           } finally {
             this.loadingClusterNodes = false;
+          }
+        },
+
+        async fetchRayStatus() {
+          this.loadingRayStatus = true;
+          try {
+            const res = await fetch('/api/compute/ray/status');
+            if (res.ok) {
+              this.rayStatus = await res.json();
+            }
+          } catch (e) {
+            console.error('Failed to fetch Ray status:', e);
+          } finally {
+            this.loadingRayStatus = false;
+          }
+        },
+
+        async startRayCluster() {
+          try {
+            const res = await fetch('/api/compute/ray/start', { method: 'POST' });
+            if (res.ok) {
+              await this.fetchRayStatus();
+              await this.fetchSqlWarehouses();
+            }
+          } catch (e) {
+            alert('Failed to start Ray cluster: ' + e.message);
+          }
+        },
+
+        async stopRayCluster() {
+          if (!confirm('Stop the Ray distributed compute cluster? All worker actors will be terminated.')) return;
+          try {
+            const res = await fetch('/api/compute/ray/stop', { method: 'POST' });
+            if (res.ok) {
+              await this.fetchRayStatus();
+              await this.fetchSqlWarehouses();
+            }
+          } catch (e) {
+            alert('Failed to stop Ray cluster: ' + e.message);
+          }
+        },
+
+        async scaleWarehouse(whId, targetWorkers) {
+          if (targetWorkers < 0) targetWorkers = 0;
+          if (targetWorkers > 16) targetWorkers = 16;
+          this.scalingWarehouseId = whId;
+          try {
+            const res = await fetch(`/api/compute/warehouses/${whId}/scale`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ target_workers: targetWorkers })
+            });
+            if (res.ok) {
+              await this.fetchSqlWarehouses();
+              await this.fetchRayStatus();
+            } else {
+              const err = await res.json();
+              alert(`Scaling failed: ${err.detail || 'Unknown error'}`);
+            }
+          } catch (e) {
+            alert('Failed to scale warehouse: ' + e.message);
+          } finally {
+            this.scalingWarehouseId = null;
+          }
+        },
+
+        async testDistributedDeltaScan(whId) {
+          this.loadingDistributedScan = whId;
+          this.distributedScanResult = null;
+          try {
+            const res = await fetch(`/api/compute/warehouses/${whId}/distributed-query`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                table_path: 'dbo/silver_employees',
+                select: '*',
+                where: ''
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) {
+                this.distributedScanResult = data;
+              } else {
+                alert(`Distributed scan error: ${data.error}`);
+              }
+            } else {
+              const err = await res.json();
+              alert(`Distributed scan request failed: ${err.detail || 'Error'}`);
+            }
+          } catch (e) {
+            alert('Error running distributed delta scan: ' + e.message);
+          } finally {
+            this.loadingDistributedScan = null;
           }
         },
 

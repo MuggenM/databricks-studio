@@ -69,6 +69,7 @@ from web.warehouses import (
     sync_catalogs_with_duckrun,
     scan_all_catalogs_and_tables
 )
+from web.ray_engine import ray_manager, RAY_INSTALLED
 
 logger = logging.getLogger("databricks_studio")
 logging.basicConfig(level=logging.INFO)
@@ -690,9 +691,20 @@ async def list_cluster_nodes():
 
 @app.get("/api/sql-warehouses")
 async def list_sql_warehouses():
+    warehouses = load_sql_warehouses()
+    ray_status = ray_manager.get_status() if RAY_INSTALLED else {"available": False}
+    for w in warehouses:
+        wh_id = w.get("id")
+        active_pool = ray_manager.actor_pools.get(wh_id, []) if RAY_INSTALLED else []
+        w["active_ray_workers"] = len(active_pool)
+        if len(active_pool) > 0:
+            w["ray_status"] = "RUNNING"
+        else:
+            w["ray_status"] = "IDLE" if w.get("state") == "RUNNING" else "STOPPED"
     return {
-        "warehouses": load_sql_warehouses(),
-        "cluster_sizes": CLUSTER_SIZES
+        "warehouses": warehouses,
+        "cluster_sizes": CLUSTER_SIZES,
+        "ray_telemetry": ray_status
     }
 
 @app.post("/api/sql-warehouses")
@@ -706,6 +718,7 @@ async def create_sql_warehouse_endpoint(payload: Dict[str, Any]):
     auto_stop = payload.get("auto_stop_mins", 10)
     is_def = payload.get("is_default", False)
     endpoint = payload.get("endpoint")
+    ray_workers = payload.get("ray_workers", 1)
     
     wh = create_sql_warehouse(
         name=name,
@@ -714,7 +727,8 @@ async def create_sql_warehouse_endpoint(payload: Dict[str, Any]):
         max_memory=max_memory,
         auto_stop_mins=auto_stop,
         is_default=is_def,
-        endpoint=endpoint
+        endpoint=endpoint,
+        ray_workers=ray_workers
     )
     return wh
 
@@ -723,6 +737,8 @@ async def get_sql_warehouse_endpoint(wh_id: str):
     wh = get_sql_warehouse(wh_id)
     if not wh:
         raise HTTPException(status_code=404, detail="Warehouse not found")
+    active_pool = ray_manager.actor_pools.get(wh_id, []) if RAY_INSTALLED else []
+    wh["active_ray_workers"] = len(active_pool)
     return wh
 
 @app.put("/api/sql-warehouses/{wh_id}")
@@ -737,6 +753,13 @@ async def start_sql_warehouse_endpoint(wh_id: str):
     wh = start_sql_warehouse(wh_id)
     if not wh:
         raise HTTPException(status_code=404, detail="Warehouse not found")
+    if RAY_INSTALLED and wh.get("ray_workers", 0) > 0:
+        try:
+            ray_manager.scale_warehouse(wh_id, wh.get("ray_workers", 1))
+        except Exception as e:
+            logger.warning(f"Could not autoscale Ray pool for {wh_id}: {e}")
+    active_pool = ray_manager.actor_pools.get(wh_id, []) if RAY_INSTALLED else []
+    wh["active_ray_workers"] = len(active_pool)
     return {"success": True, "warehouse": wh}
 
 @app.post("/api/sql-warehouses/{wh_id}/stop")
@@ -744,14 +767,105 @@ async def stop_sql_warehouse_endpoint(wh_id: str):
     wh = stop_sql_warehouse(wh_id)
     if not wh:
         raise HTTPException(status_code=404, detail="Warehouse not found")
+    if RAY_INSTALLED:
+        try:
+            ray_manager.scale_warehouse(wh_id, 0)
+        except Exception as e:
+            logger.warning(f"Could not scale down Ray pool for {wh_id}: {e}")
+    wh["active_ray_workers"] = 0
     return {"success": True, "warehouse": wh}
 
 @app.delete("/api/sql-warehouses/{wh_id}")
 async def delete_sql_warehouse_endpoint(wh_id: str):
+    if RAY_INSTALLED:
+        try:
+            ray_manager.scale_warehouse(wh_id, 0)
+        except Exception:
+            pass
     ok = delete_sql_warehouse(wh_id)
     if not ok:
         raise HTTPException(status_code=400, detail="Cannot delete default warehouse or warehouse not found")
     return {"success": True, "deleted_id": wh_id}
+
+# ==================== RAY COMPUTE ENGINE & DISTRIBUTED SCALING ====================
+
+@app.get("/api/compute/ray/status")
+async def get_ray_cluster_status():
+    """Returns Ray cluster health, physical/virtual resources, and active actor pools."""
+    return ray_manager.get_status()
+
+@app.post("/api/compute/ray/start")
+async def start_ray_cluster_endpoint(payload: Optional[Dict[str, Any]] = None):
+    """Initializes or connects to Ray cluster."""
+    num_cpus = payload.get("num_cpus") if payload else None
+    success = ray_manager.initialize_ray(num_cpus=num_cpus)
+    status = ray_manager.get_status()
+    return {"success": success, "status": status}
+
+@app.post("/api/compute/ray/stop")
+async def stop_ray_cluster_endpoint():
+    """Stops all warehouse worker actors and shuts down the Ray cluster."""
+    if not RAY_INSTALLED:
+        return {"success": False, "error": "Ray library not installed"}
+    try:
+        import ray
+        for wh_id in list(ray_manager.actor_pools.keys()):
+            ray_manager.scale_warehouse(wh_id, 0)
+        if ray.is_initialized():
+            ray.shutdown()
+        return {"success": True, "message": "Ray cluster and all actor pools stopped"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/compute/warehouses/{wh_id}/scale")
+async def scale_warehouse_endpoint(wh_id: str, payload: Dict[str, Any]):
+    """Dynamically scales the Ray DuckDBWorkerActor pool for a warehouse on the fly."""
+    target_workers = payload.get("target_workers")
+    if target_workers is None:
+        raise HTTPException(status_code=400, detail="target_workers parameter is required")
+    try:
+        target_workers = int(target_workers)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="target_workers must be an integer")
+
+    wh = get_sql_warehouse(wh_id)
+    if not wh:
+        raise HTTPException(status_code=404, detail=f"Warehouse '{wh_id}' not found")
+
+    res = ray_manager.scale_warehouse(
+        warehouse_id=wh_id,
+        target_workers=target_workers,
+        max_memory=wh.get("max_memory", "2GB"),
+        threads=wh.get("threads", 2)
+    )
+    update_sql_warehouse(wh_id, {"ray_workers": target_workers})
+    wh_updated = get_sql_warehouse(wh_id)
+    if wh_updated:
+        active_pool = ray_manager.actor_pools.get(wh_id, [])
+        wh_updated["active_ray_workers"] = len(active_pool)
+    res["warehouse"] = wh_updated
+    return res
+
+@app.post("/api/compute/warehouses/{wh_id}/distributed-query")
+async def execute_distributed_delta_query(wh_id: str, payload: Dict[str, Any]):
+    """Executes a distributed Map-Reduce query across Delta Lake Parquet partitions using Ray tasks."""
+    table_path = payload.get("table_path")
+    select_clause = payload.get("select", "*")
+    where_clause = payload.get("where", "")
+
+    if not table_path:
+        raise HTTPException(status_code=400, detail="table_path parameter is required")
+
+    if not os.path.isabs(table_path):
+        table_path = os.path.join(WAREHOUSE_DIR, table_path)
+
+    res = ray_manager.execute_distributed_delta_scan(
+        warehouse_id=wh_id,
+        table_path=table_path,
+        select_clause=select_clause,
+        where_clause=where_clause
+    )
+    return res
 
 @app.delete("/api/table/{schema_name}/{table_name}")
 async def drop_table_api(schema_name: str, table_name: str, catalog: Optional[str] = "warehouse"):
@@ -1212,6 +1326,24 @@ async def execute_sql(payload: QueryRequest, request: Request):
                     continue
         except Exception as e_rem:
             logger.warning(f"Remote compute node dispatch failed for {wh.get('endpoint')}: {e_rem}")
+
+    # 2. Attempt Ray Actor Pool Dispatch (if Ray is active or warehouse has ray_workers configured)
+    if not remote_executed and wh and RAY_INSTALLED and (wh.get("id") in ray_manager.actor_pools or wh.get("ray_workers", 0) > 0):
+        try:
+            ray_res = ray_manager.execute_query(wh["id"], query)
+            if ray_res and ray_res.get("success"):
+                remote_data = {
+                    "success": True,
+                    "columns": ray_res.get("columns", []),
+                    "rows": ray_res.get("rows", []),
+                    "row_count": ray_res.get("row_count", 0),
+                    "elapsed_ms": ray_res.get("duration_ms", round((time.perf_counter() - start_time) * 1000, 2)),
+                    "executed_by": ray_res.get("actor_id", f"ray-worker-{wh['id']}"),
+                    "is_mutation": False
+                }
+                remote_executed = True
+        except Exception as e_ray:
+            logger.warning(f"Ray actor pool dispatch failed for {wh.get('id')}: {e_ray}")
 
     if remote_executed and remote_data is not None:
         elapsed_ms = remote_data.get("elapsed_ms", round((time.perf_counter() - start_time) * 1000, 2))

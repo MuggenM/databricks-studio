@@ -10,10 +10,13 @@
       "state": "RUNNING",
       "is_default": true,
       "channel": "DuckDB 1.5.5",
-      "query_count": 97,
+      "query_count": 101,
       "created_at": "2026-09-12 02:18:25",
-      "last_active_at": "2026-09-15 16:35:44",
-      "endpoint": "http://compute-node-01:8001"
+      "last_active_at": "2026-09-16 22:00:15",
+      "endpoint": "http://compute-node-01:8001",
+      "ray_workers": 5,
+      "min_workers": 0,
+      "max_workers": 16
     },
     {
       "id": "wh_analytics_pro",
@@ -28,7 +31,10 @@
       "query_count": 5,
       "created_at": "2026-09-12 02:18:25",
       "last_active_at": "2026-09-15 16:35:48",
-      "endpoint": "http://compute-node-02:8002"
+      "endpoint": "http://compute-node-02:8002",
+      "ray_workers": 1,
+      "min_workers": 0,
+      "max_workers": 16
     },
     {
       "id": "wh_etl_batch",
@@ -43,8 +49,11 @@
       "query_count": 3,
       "created_at": "2026-09-12 02:18:25",
       "last_active_at": "2026-09-15 16:35:51",
-      "endpoint": "http://compute-node-03:8003"
+      "endpoint": "http://compute-node-03:8003",
+      "ray_workers": 1,
+      "min_workers": 0,
+      "max_workers": 16
     }
   ],
-  "updated_at": "2026-09-15T16:35:51.159140"
+  "updated_at": "2026-09-16T22:04:11.323929"
 }
