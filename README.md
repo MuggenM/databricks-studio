@@ -1,5 +1,7 @@
 # Local Databricks Lakehouse & Studio (SQLFrame + DuckDB + duckrun)
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+
 A lightweight, local Databricks developer environment that provides full Lakehouse and Spark DataFrame developer parity without requiring a JVM or cloud cluster infrastructure.
 
 Includes **Databricks Local Studio**—a custom Databricks-inspired web workbench with **Data Ingestion ("Add Data" Wizard)**, **Unity Catalog Explorer**, **Monaco SQL Editor**, and **Delta Time-Travel Inspector**.
@@ -317,3 +319,9 @@ Open [`notebooks/sample_lakehouse_pipeline.ipynb`](notebooks/sample_lakehouse_pi
 3. **Inspect Delta Logs**: Run `dbutils.fs.ls("dbfs:/silver_employees")` to inspect Parquet data and `_delta_log/` transaction files.
 4. **Interactive SQL**: Run SQL analytics with `%%sql`.
 5. **ACID Transactions & Time Travel**: Execute `UPDATE` statements and query historical snapshots using `delta_scan('...', version => 0)`.
+
+---
+
+## 📄 License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [`LICENSE`](LICENSE) file for the full license text.
