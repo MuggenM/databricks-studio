@@ -5,6 +5,10 @@
       "name": "Executive Lakehouse Overview",
       "description": "Real-time KPI metrics and visual analytics across workforce, market equity, products, and customer revenue with interactive parameters.",
       "created_at": "2026-09-12 02:30:00",
+      "auto_refresh_enabled": false,
+      "auto_refresh_interval": 30,
+      "date_range_enabled": true,
+      "date_column": "hire_date",
       "filters": [
         {
           "key": "department",
@@ -29,6 +33,12 @@
           "dimension": "category",
           "table": "dim_products",
           "default": "ALL"
+        },
+        {
+          "key": "date_range",
+          "label": "Date Range",
+          "type": "daterange",
+          "default": "all_time"
         }
       ],
       "widgets": [
@@ -36,7 +46,7 @@
           "id": "w_kpi_1",
           "title": "Total Workforce",
           "type": "kpi",
-          "query": "SELECT COUNT(*) as value FROM silver_employees WHERE (:department IS NULL OR department = :department)",
+          "query": "SELECT COUNT(*) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
           "unit": "employees",
           "width": "col-span-1"
         },
@@ -44,7 +54,7 @@
           "id": "w_kpi_2",
           "title": "Annual Payroll",
           "type": "kpi",
-          "query": "SELECT SUM(salary) as value FROM silver_employees WHERE (:department IS NULL OR department = :department)",
+          "query": "SELECT SUM(salary) as value FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
           "unit": "$",
           "width": "col-span-1"
         },
@@ -69,7 +79,7 @@
           "title": "Average Salary by Department",
           "type": "bar",
           "filter_dimension": "department",
-          "query": "SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees WHERE (:department IS NULL OR department = :department) GROUP BY department ORDER BY avg_salary DESC",
+          "query": "SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees WHERE (:department IS NULL OR department = :department) AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date) GROUP BY department ORDER BY avg_salary DESC",
           "x_col": "department",
           "y_col": "avg_salary",
           "unit": "$",
@@ -171,6 +181,69 @@
           "x_col": "department",
           "y_col": "headcount",
           "z_col": "rank",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_scatter_1",
+          "title": "Salary vs Bonus Analysis",
+          "type": "scatter",
+          "query": "SELECT salary, bonus_estimate FROM silver_employees WHERE salary IS NOT NULL AND bonus_estimate IS NOT NULL AND (:start_date IS NULL OR :start_date = '' OR hire_date >= :start_date) AND (:end_date IS NULL OR :end_date = '' OR hire_date <= :end_date)",
+          "x_col": "salary",
+          "y_col": "bonus_estimate",
+          "unit": "$",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_scatter_2",
+          "title": "Market Cap vs P/E Ratio",
+          "type": "scatter",
+          "query": "SELECT market_cap_b, pe_ratio FROM nyse_tickers WHERE market_cap_b IS NOT NULL AND pe_ratio IS NOT NULL",
+          "x_col": "market_cap_b",
+          "y_col": "pe_ratio",
+          "unit": "",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_scatter_3",
+          "title": "Employee Rank vs Compensation",
+          "type": "scatter",
+          "query": "SELECT rank, salary FROM silver_employees WHERE rank IS NOT NULL AND salary IS NOT NULL",
+          "x_col": "rank",
+          "y_col": "salary",
+          "unit": "$",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_heatmap_1",
+          "title": "Department vs Rank Headcount Matrix",
+          "type": "heatmap",
+          "query": "SELECT department, CAST(rank AS VARCHAR) as rank_level, COUNT(*) as headcount FROM silver_employees GROUP BY department, rank ORDER BY department, rank",
+          "x_col": "department",
+          "y_col": "headcount",
+          "z_col": "rank_level",
+          "unit": "employees",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_heatmap_2",
+          "title": "Product Category Inventory Heatmap",
+          "type": "heatmap",
+          "query": "SELECT category, CASE WHEN stock_qty < 50 THEN 'Low' WHEN stock_qty < 150 THEN 'Medium' ELSE 'High' END as stock_level, SUM(price * stock_qty) as total_value FROM dim_products GROUP BY category, stock_level ORDER BY category, stock_level",
+          "x_col": "category",
+          "y_col": "total_value",
+          "z_col": "stock_level",
+          "unit": "$",
+          "width": "col-span-2"
+        },
+        {
+          "id": "w_heatmap_3",
+          "title": "Customer Segment vs Spending Tier",
+          "type": "heatmap",
+          "query": "SELECT segment, CASE WHEN annual_spend < 50000 THEN 'Tier 1' WHEN annual_spend < 80000 THEN 'Tier 2' ELSE 'Tier 3' END as spend_tier, COUNT(*) as customer_count FROM dim_customers GROUP BY segment, spend_tier ORDER BY segment, spend_tier",
+          "x_col": "segment",
+          "y_col": "customer_count",
+          "z_col": "spend_tier",
+          "unit": "customers",
           "width": "col-span-2"
         }
       ]

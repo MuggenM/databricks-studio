@@ -4379,6 +4379,12 @@
               <span>Share</span>
             </button>
 
+            <!-- Schedule Exports Button -->
+            <button @click="showScheduledExportsModal = true" class="px-3 py-1.5 bg-white hover:bg-slate-50 dark:bg-dbx-panel dark:hover:bg-dbx-hover text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition border border-slate-200 dark:border-dbx-border">
+              <i class="ph ph-clock text-xs"></i>
+              <span>Schedule</span>
+            </button>
+
             <button @click="openAddWidgetModal()" class="px-3 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
               <i class="ph ph-plus text-xs"></i>
               <span>Add Widget</span>
@@ -7793,6 +7799,175 @@
         <button @click="submitCreateDashboard()" type="button" class="px-4 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition">
           <i class="ph ph-plus text-xs"></i>
           <span>Create Dashboard</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SCHEDULED EXPORTS MODAL ================= -->
+  <div x-show="showScheduledExportsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showScheduledExportsModal = false" x-init="$watch('showScheduledExportsModal', val => { if(val) fetchScheduledExports() })">
+    <div class="bg-dbx-panel border border-dbx-border rounded-xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col" @click.outside="showScheduledExportsModal = false">
+      <div class="flex items-center justify-between border-b border-dbx-border p-6 pb-4">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+          <i class="ph ph-clock text-indigo-400 text-lg"></i>
+          <span>Scheduled Exports</span>
+        </h3>
+        <button @click="showScheduledExportsModal = false" class="text-slate-400 hover:text-white text-sm">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-3">
+        <!-- Create New Schedule Button -->
+        <button @click="openCreateScheduleModal()" class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded flex items-center justify-center space-x-1.5 transition">
+          <i class="ph ph-plus text-sm"></i>
+          <span>Create New Schedule</span>
+        </button>
+
+        <!-- Scheduled Exports List -->
+        <div class="space-y-2">
+          <template x-if="scheduledExports.length === 0">
+            <div class="text-center py-8 text-slate-400 text-xs">
+              <i class="ph ph-clock text-3xl mb-2"></i>
+              <p>No scheduled exports yet</p>
+            </div>
+          </template>
+
+          <template x-for="schedule in scheduledExports" :key="schedule.id">
+            <div class="bg-slate-900/80 border border-dbx-border rounded-lg p-4 space-y-3">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-2 mb-1">
+                    <h4 class="text-sm font-semibold text-white" x-text="schedule.name"></h4>
+                    <span class="text-[10px] px-2 py-0.5 rounded font-mono" :class="schedule.enabled ? 'bg-emerald-900/50 text-emerald-400' : 'bg-slate-800 text-slate-500'" x-text="schedule.enabled ? 'ENABLED' : 'DISABLED'"></span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div class="flex items-center space-x-1.5 text-slate-400">
+                      <i class="ph ph-arrows-clockwise text-xs"></i>
+                      <span class="capitalize" x-text="schedule.frequency"></span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-slate-400">
+                      <i class="ph ph-file-arrow-down text-xs"></i>
+                      <span class="uppercase" x-text="schedule.format"></span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-slate-400" x-show="schedule.last_run">
+                      <i class="ph ph-clock-countdown text-xs"></i>
+                      <span class="text-[10px]">Last: <span x-text="schedule.last_run"></span></span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-slate-400" x-show="schedule.next_run">
+                      <i class="ph ph-calendar-dots text-xs"></i>
+                      <span class="text-[10px]">Next: <span x-text="schedule.next_run"></span></span>
+                    </div>
+                    <div class="flex items-center space-x-1.5" x-show="schedule.last_run_status">
+                      <i class="ph ph-check-circle text-xs" :class="schedule.last_run_status === 'success' ? 'text-emerald-400' : 'text-red-400'"></i>
+                      <span class="text-[10px]" :class="schedule.last_run_status === 'success' ? 'text-emerald-400' : 'text-red-400'" x-text="schedule.last_run_status === 'success' ? (schedule.last_run_files + ' files') : 'Error'"></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <button @click="toggleScheduleEnabled(schedule)" class="p-1.5 hover:bg-dbx-hover rounded text-slate-400 hover:text-white transition" :title="schedule.enabled ? 'Disable' : 'Enable'">
+                    <i class="ph text-sm" :class="schedule.enabled ? 'ph-pause-circle' : 'ph-play-circle'"></i>
+                  </button>
+                  <button @click="triggerScheduleNow(schedule.id)" class="p-1.5 hover:bg-dbx-hover rounded text-slate-400 hover:text-indigo-400 transition" title="Run Now">
+                    <i class="ph ph-play text-sm"></i>
+                  </button>
+                  <button @click="deleteSchedule(schedule.id)" class="p-1.5 hover:bg-dbx-hover rounded text-slate-400 hover:text-red-400 transition" title="Delete">
+                    <i class="ph ph-trash text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 p-6 pt-4 border-t border-dbx-border">
+        <button @click="showScheduledExportsModal = false" type="button" class="px-4 py-1.5 bg-slate-900 hover:bg-dbx-hover border border-dbx-border text-slate-300 text-xs rounded transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CREATE SCHEDULE MODAL ================= -->
+  <div x-show="showCreateScheduleModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @keydown.escape.window="showCreateScheduleModal = false">
+    <div class="bg-dbx-panel border border-dbx-border rounded-xl w-full max-w-lg shadow-2xl p-6 space-y-4" @click.outside="showCreateScheduleModal = false">
+      <div class="flex items-center justify-between border-b border-dbx-border pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+          <i class="ph ph-plus-circle text-indigo-400 text-lg"></i>
+          <span>Create Scheduled Export</span>
+        </h3>
+        <button @click="showCreateScheduleModal = false" class="text-slate-400 hover:text-white text-sm">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Schedule Name</label>
+          <input type="text" x-model="newSchedule.name" placeholder="e.g. Daily Sales Report" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Frequency</label>
+          <select x-model="newSchedule.frequency" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            <option value="hourly">Hourly</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+
+        <div x-show="newSchedule.frequency === 'daily' || newSchedule.frequency === 'weekly' || newSchedule.frequency === 'monthly'" class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Hour (0-23)</label>
+            <input type="number" x-model.number="newSchedule.hour" min="0" max="23" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Minute (0-59)</label>
+            <input type="number" x-model.number="newSchedule.minute" min="0" max="59" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div x-show="newSchedule.frequency === 'weekly'">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Day of Week</label>
+          <select x-model.number="newSchedule.day_of_week" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </div>
+
+        <div x-show="newSchedule.frequency === 'monthly'">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Day of Month (1-31)</label>
+          <input type="number" x-model.number="newSchedule.day_of_month" min="1" max="31" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Export Format</label>
+          <select x-model="newSchedule.format" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+            <option value="csv">CSV</option>
+            <option value="parquet">Parquet</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <input type="checkbox" x-model="newSchedule.enabled" id="scheduleEnabled" class="w-4 h-4 bg-slate-900 border border-dbx-border rounded focus:ring-indigo-500">
+          <label for="scheduleEnabled" class="text-xs text-slate-300">Enable immediately</label>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-dbx-border">
+        <button @click="showCreateScheduleModal = false" type="button" class="px-3 py-1.5 bg-slate-900 hover:bg-dbx-hover border border-dbx-border text-slate-300 text-xs rounded transition">
+          Cancel
+        </button>
+        <button @click="submitCreateSchedule()" type="button" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition">
+          <i class="ph ph-check text-xs"></i>
+          <span>Create Schedule</span>
         </button>
       </div>
     </div>
@@ -11721,6 +11896,20 @@
         autoRefreshCountdownTimer: null,
         showAddWidgetModal: false,
         showNewDashboardModal: false,
+        showScheduledExportsModal: false,
+        scheduledExports: [],
+        showCreateScheduleModal: false,
+        newSchedule: {
+          name: '',
+          frequency: 'daily',
+          format: 'csv',
+          hour: 0,
+          minute: 0,
+          day_of_week: 0,
+          day_of_month: 1,
+          widget_ids: [],
+          enabled: true
+        },
         widgetTesting: false,
         widgetTestResult: null,
         chartInstances: {},
@@ -14791,6 +14980,138 @@
             }
           } catch (e) {
             alert('Error creating share link: ' + e.message);
+          }
+        },
+
+        // ==================== SCHEDULED EXPORTS ====================
+
+        async fetchScheduledExports() {
+          try {
+            const res = await fetch(`/api/schedules?dashboard_id=${this.selectedDashboardId}`);
+            const data = await res.json();
+            if (data.success) {
+              this.scheduledExports = data.schedules;
+            }
+          } catch (e) {
+            console.error('Failed to fetch scheduled exports:', e);
+          }
+        },
+
+        openCreateScheduleModal() {
+          this.newSchedule = {
+            name: '',
+            frequency: 'daily',
+            format: 'csv',
+            hour: 0,
+            minute: 0,
+            day_of_week: 0,
+            day_of_month: 1,
+            widget_ids: [],
+            enabled: true
+          };
+          this.showCreateScheduleModal = true;
+        },
+
+        async submitCreateSchedule() {
+          if (!this.newSchedule.name) {
+            alert('Please enter a schedule name');
+            return;
+          }
+
+          if (!this.selectedDashboardId) {
+            alert('Please select a dashboard first');
+            return;
+          }
+
+          try {
+            const payload = {
+              dashboard_id: this.selectedDashboardId,
+              name: this.newSchedule.name,
+              frequency: this.newSchedule.frequency,
+              format: this.newSchedule.format,
+              hour: this.newSchedule.hour,
+              minute: this.newSchedule.minute,
+              day_of_week: this.newSchedule.day_of_week,
+              day_of_month: this.newSchedule.day_of_month,
+              widget_ids: this.newSchedule.widget_ids,
+              enabled: this.newSchedule.enabled
+            };
+
+            const res = await fetch('/api/schedules', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+              alert('✅ Schedule created successfully!');
+              this.showCreateScheduleModal = false;
+              await this.fetchScheduledExports();
+            } else {
+              alert('Failed to create schedule: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error creating schedule: ' + e.message);
+          }
+        },
+
+        async toggleScheduleEnabled(schedule) {
+          try {
+            const res = await fetch(`/api/schedules/${schedule.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabled: !schedule.enabled })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+              await this.fetchScheduledExports();
+            } else {
+              alert('Failed to toggle schedule: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error toggling schedule: ' + e.message);
+          }
+        },
+
+        async triggerScheduleNow(scheduleId) {
+          if (!confirm('Run this scheduled export now?')) return;
+
+          try {
+            const res = await fetch(`/api/schedules/${scheduleId}/trigger`, {
+              method: 'POST'
+            });
+
+            const data = await res.json();
+            if (data.success) {
+              alert('✅ Export started! Check the schedule history in a few moments.');
+              setTimeout(() => this.fetchScheduledExports(), 2000);
+            } else {
+              alert('Failed to trigger export: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error triggering export: ' + e.message);
+          }
+        },
+
+        async deleteSchedule(scheduleId) {
+          if (!confirm('Delete this scheduled export? This cannot be undone.')) return;
+
+          try {
+            const res = await fetch(`/api/schedules/${scheduleId}`, {
+              method: 'DELETE'
+            });
+
+            const data = await res.json();
+            if (data.success) {
+              alert('✅ Schedule deleted');
+              await this.fetchScheduledExports();
+            } else {
+              alert('Failed to delete schedule: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            alert('Error deleting schedule: ' + e.message);
           }
         },
 

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8891/api/dashboards)",
+      "Bash(curl -s \"http://localhost:8891/api/dashboards/dash_executive_lakehouse\")",
+      "Bash(python3 -c ' *)",
+      "Bash(git commit -m 'feat: Add drill-down navigation from charts to SQL Editor *)",
+      "Bash(awk '/@app.get.*export/,/@app/ {print NR\": \"$0}' /datadrive/databricks-studio/web/app.py)",
+      "Bash(awk '/1966:/{getline; print; exit}')",
+      "Bash(git commit -m 'feat: Add in-memory query result caching for performance *)",
+      "Bash(git commit -m 'feat: Add visual alert thresholds for KPI monitoring *)"
+    ]
+  }
+}

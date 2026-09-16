@@ -91,6 +91,15 @@ async def startup_event():
         asyncio.create_task(asyncio.to_thread(scan_and_sync_all_assets))
     except Exception as e_lin:
         logger.warning(f"Failed to auto-scan lineage on startup: {e_lin}")
+    # Initialize scheduled exports
+    from web.scheduled_exports import init_scheduler
+    init_scheduler()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    from web.scheduled_exports import shutdown_scheduler
+    shutdown_scheduler()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -2270,6 +2279,116 @@ async def delete_widget_comment(widget_id: str, comment_id: str, current_user: d
     if not success:
         raise HTTPException(status_code=404, detail="Comment not found")
     return {"success": True}
+
+# ==================== SCHEDULED EXPORTS APIS ====================
+
+@app.get("/api/schedules")
+async def list_schedules(dashboard_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """List all scheduled exports."""
+    from web.scheduled_exports import list_schedules as list_schedules_func
+    schedules = list_schedules_func(dashboard_id)
+    return {"success": True, "schedules": schedules}
+
+@app.get("/api/schedules/{schedule_id}")
+async def get_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific scheduled export."""
+    from web.scheduled_exports import get_schedule as get_schedule_func
+    schedule = get_schedule_func(schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"success": True, "schedule": schedule}
+
+@app.post("/api/schedules")
+async def create_schedule(
+    dashboard_id: str,
+    name: str,
+    frequency: str,
+    format: str = "csv",
+    widget_ids: Optional[List[str]] = None,
+    hour: int = 0,
+    minute: int = 0,
+    day_of_week: int = 0,
+    day_of_month: int = 1,
+    cron_expression: Optional[str] = None,
+    enabled: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new scheduled export."""
+    from web.scheduled_exports import create_schedule as create_schedule_func
+    schedule_id = create_schedule_func(
+        dashboard_id=dashboard_id,
+        name=name,
+        frequency=frequency,
+        format=format,
+        widget_ids=widget_ids,
+        created_by=current_user["username"],
+        hour=hour,
+        minute=minute,
+        day_of_week=day_of_week,
+        day_of_month=day_of_month,
+        cron_expression=cron_expression,
+        enabled=enabled
+    )
+    return {"success": True, "schedule_id": schedule_id}
+
+@app.put("/api/schedules/{schedule_id}")
+async def update_schedule(
+    schedule_id: str,
+    name: Optional[str] = None,
+    frequency: Optional[str] = None,
+    format: Optional[str] = None,
+    widget_ids: Optional[List[str]] = None,
+    enabled: Optional[bool] = None,
+    hour: Optional[int] = None,
+    minute: Optional[int] = None,
+    day_of_week: Optional[int] = None,
+    day_of_month: Optional[int] = None,
+    cron_expression: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a scheduled export."""
+    from web.scheduled_exports import update_schedule as update_schedule_func
+    success = update_schedule_func(
+        schedule_id=schedule_id,
+        name=name,
+        frequency=frequency,
+        format=format,
+        widget_ids=widget_ids,
+        enabled=enabled,
+        hour=hour,
+        minute=minute,
+        day_of_week=day_of_week,
+        day_of_month=day_of_month,
+        cron_expression=cron_expression
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"success": True}
+
+@app.delete("/api/schedules/{schedule_id}")
+async def delete_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a scheduled export."""
+    from web.scheduled_exports import delete_schedule as delete_schedule_func
+    success = delete_schedule_func(schedule_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"success": True}
+
+@app.post("/api/schedules/{schedule_id}/trigger")
+async def trigger_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Manually trigger a scheduled export."""
+    from web.scheduled_exports import trigger_schedule_now
+    success = trigger_schedule_now(schedule_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"success": True, "message": "Export triggered"}
+
+@app.get("/api/schedules/{schedule_id}/history")
+async def get_schedule_history(schedule_id: str, limit: int = 10, current_user: dict = Depends(get_current_user)):
+    """Get export history for a schedule."""
+    from web.scheduled_exports import get_export_history
+    history = get_export_history(schedule_id, limit)
+    return {"success": True, "history": history}
 
 class PreviewWidgetRequest(BaseModel):
     query: str

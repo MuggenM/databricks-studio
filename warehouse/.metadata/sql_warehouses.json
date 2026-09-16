@@ -10,9 +10,9 @@
       "state": "RUNNING",
       "is_default": true,
       "channel": "DuckDB 1.5.5",
-      "query_count": 96,
+      "query_count": 97,
       "created_at": "2026-09-12 02:18:25",
-      "last_active_at": "2026-09-14 03:20:12",
+      "last_active_at": "2026-09-15 16:35:44",
       "endpoint": "http://compute-node-01:8001"
     },
     {
@@ -25,9 +25,9 @@
       "state": "RUNNING",
       "is_default": false,
       "channel": "DuckDB 1.5.5 (Vectorized)",
-      "query_count": 4,
+      "query_count": 5,
       "created_at": "2026-09-12 02:18:25",
-      "last_active_at": "2026-09-14 02:57:28",
+      "last_active_at": "2026-09-15 16:35:48",
       "endpoint": "http://compute-node-02:8002"
     },
     {
@@ -40,11 +40,11 @@
       "state": "RUNNING",
       "is_default": false,
       "channel": "DuckDB 1.5.5",
-      "query_count": 2,
+      "query_count": 3,
       "created_at": "2026-09-12 02:18:25",
-      "last_active_at": "2026-09-13 21:41:00",
+      "last_active_at": "2026-09-15 16:35:51",
       "endpoint": "http://compute-node-03:8003"
     }
   ],
-  "updated_at": "2026-09-14T03:20:12.937644"
+  "updated_at": "2026-09-15T16:35:51.159140"
 }
