@@ -3087,6 +3087,79 @@ async def get_brand_css():
     return Response(content=css, media_type="text/css")
 
 
+# ==================== DASHBOARD EMBED APIS ====================
+
+@app.get("/embed/dashboard/{dashboard_id}")
+async def get_embedded_dashboard(dashboard_id: str, request: Request, theme: str = "auto"):
+    """Serve dashboard in embeddable iframe view (minimal UI)."""
+    templates = Jinja2Templates(directory="web/templates")
+
+    # Load dashboard
+    dashboards = load_dashboards_store()
+    dashboard = next((d for d in dashboards if d["id"] == dashboard_id), None)
+
+    if not dashboard:
+        return HTMLResponse(content="<html><body><h1>Dashboard not found</h1></body></html>", status_code=404)
+
+    # Return embedded view with minimal UI
+    return templates.TemplateResponse("embed.html", {
+        "request": request,
+        "dashboard": dashboard,
+        "dashboard_id": dashboard_id,
+        "theme": theme
+    })
+
+
+@app.get("/api/dashboards/{dashboard_id}/embed-code")
+async def get_dashboard_embed_code(
+    dashboard_id: str,
+    width: str = "100%",
+    height: str = "600px",
+    theme: str = "auto",
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate iframe embed code for dashboard."""
+    from web.dashboard_permissions import can_view_dashboard
+
+    # Check if user can view dashboard
+    if not can_view_dashboard(dashboard_id, current_user["username"], current_user["role"]):
+        raise HTTPException(status_code=403, detail="You don't have permission to embed this dashboard")
+
+    # Get base URL from environment or use localhost
+    base_url = os.getenv("BASE_URL", "http://localhost:8891")
+
+    # Generate embed URL
+    embed_url = f"{base_url}/embed/dashboard/{dashboard_id}?theme={theme}"
+
+    # Generate iframe code
+    iframe_code = f'''<iframe
+  src="{embed_url}"
+  width="{width}"
+  height="{height}"
+  frameborder="0"
+  style="border: none; border-radius: 8px;"
+  allowfullscreen>
+</iframe>'''
+
+    # Generate responsive version
+    responsive_code = f'''<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+  <iframe
+    src="{embed_url}"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; border-radius: 8px;"
+    frameborder="0"
+    allowfullscreen>
+  </iframe>
+</div>'''
+
+    return {
+        "success": True,
+        "embed_url": embed_url,
+        "iframe_code": iframe_code,
+        "responsive_code": responsive_code,
+        "dashboard_id": dashboard_id
+    }
+
+
 # ==================== INCREMENTAL REFRESH APIS ====================
 
 @app.get("/api/incremental/watermarks/{widget_id}")

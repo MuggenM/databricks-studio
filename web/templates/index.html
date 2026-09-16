@@ -4402,6 +4402,12 @@
               <span>Email</span>
             </button>
 
+            <!-- Embed Dashboard Button -->
+            <button @click="openEmbedModal()" class="px-3 py-1.5 bg-white hover:bg-slate-50 dark:bg-dbx-panel dark:hover:bg-dbx-hover text-slate-700 dark:text-slate-200 rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition border border-slate-200 dark:border-dbx-border">
+              <i class="ph ph-code text-xs"></i>
+              <span>Embed</span>
+            </button>
+
             <button @click="openAddWidgetModal()" class="px-3 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
               <i class="ph ph-plus text-xs"></i>
               <span>Add Widget</span>
@@ -11517,6 +11523,119 @@
     </div>
   </div>
 
+  <!-- Modal: Embed Dashboard -->
+  <div x-show="showEmbedModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @keydown.escape.window="showEmbedModal = false">
+    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" @click.outside="showEmbedModal = false">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-dbx-border pb-3 sticky top-0 bg-white dark:bg-dbx-panel">
+        <div class="flex items-center space-x-2">
+          <i class="ph ph-code text-lg text-indigo-600"></i>
+          <div>
+            <h4 class="font-bold text-slate-900 dark:text-white text-sm">Embed Dashboard</h4>
+            <p class="text-[10px] text-slate-500">Generate iframe code to embed in websites</p>
+          </div>
+        </div>
+        <button @click="showEmbedModal = false" class="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <!-- Preview -->
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold uppercase text-[10px] mb-2">Preview</label>
+          <div class="relative bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-4 aspect-video flex items-center justify-center">
+            <div class="text-center">
+              <i class="ph ph-monitor text-4xl text-slate-400 mb-2"></i>
+              <p class="text-sm text-slate-500">Your dashboard will appear here</p>
+              <a :href="embedUrl" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-700 mt-2 inline-block">
+                Open in new tab →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Options -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Width</label>
+            <select x-model="embedOptions.width" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-xs">
+              <option value="100%">100% (Responsive)</option>
+              <option value="800px">800px</option>
+              <option value="1000px">1000px</option>
+              <option value="1200px">1200px</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Height</label>
+            <select x-model="embedOptions.height" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-xs">
+              <option value="400px">400px</option>
+              <option value="600px">600px</option>
+              <option value="800px">800px</option>
+              <option value="100%">100% (Full height)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Theme</label>
+            <select x-model="embedOptions.theme" @change="generateEmbedCode()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-xs">
+              <option value="auto">Auto (System)</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" x-model="embedOptions.responsive" class="w-4 h-4 text-indigo-600 rounded">
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Responsive</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Embed Code -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-slate-700 dark:text-slate-300 font-semibold uppercase text-[10px]">Embed Code</label>
+            <button @click="copyEmbedCode()" class="px-2 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded transition flex items-center space-x-1">
+              <i class="ph ph-copy text-xs"></i>
+              <span x-text="embedCopied ? 'Copied!' : 'Copy'"></span>
+            </button>
+          </div>
+          <div class="relative">
+            <textarea x-model="embedCode" readonly rows="8" class="w-full bg-slate-900 text-slate-100 font-mono text-[10px] border border-slate-700 rounded-lg p-3 focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">
+            <i class="ph ph-info mr-1"></i>
+            Paste this code into your website's HTML
+          </p>
+        </div>
+
+        <!-- Embed URL -->
+        <div>
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold uppercase text-[10px] mb-2">Direct Link</label>
+          <div class="flex items-center space-x-2">
+            <input type="text" x-model="embedUrl" readonly class="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-xs font-mono">
+            <button @click="copyEmbedUrl()" class="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition text-xs">
+              <i class="ph ph-copy"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p class="text-[10px] text-blue-700 dark:text-blue-400">
+            <i class="ph ph-lightbulb mr-1"></i>
+            <strong>Tip:</strong> The embedded view shows a clean, minimal interface perfect for embedding in websites, portals, or documentation.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-dbx-border">
+        <button @click="showEmbedModal = false" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition font-medium text-xs">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Reset User Password Prompt -->
   <div x-show="resetPasswordModalOpen" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="resetPasswordModalOpen = false">
     <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4" @click.outside="resetPasswordModalOpen = false">
@@ -12104,6 +12223,16 @@
           level: 'viewer'
         },
         transferOwnershipTo: '',
+        showEmbedModal: false,
+        embedUrl: '',
+        embedCode: '',
+        embedCopied: false,
+        embedOptions: {
+          width: '100%',
+          height: '600px',
+          theme: 'auto',
+          responsive: false
+        },
         isLoadingSettings: false,
         isSavingSettings: false,
         jupyterPort: '{{ jupyter_port }}',
@@ -13938,6 +14067,66 @@
             }
           } catch (e) {
             alert('❌ Error transferring ownership:\n\n' + e.message);
+          }
+        },
+
+        // Embed Dashboard Functions
+        async openEmbedModal() {
+          if (!this.currentDashboard) return;
+
+          this.showEmbedModal = true;
+          await this.generateEmbedCode();
+        },
+
+        async generateEmbedCode() {
+          if (!this.currentDashboard) return;
+
+          try {
+            const params = new URLSearchParams({
+              width: this.embedOptions.width,
+              height: this.embedOptions.height,
+              theme: this.embedOptions.theme
+            });
+
+            const res = await fetch(`/api/dashboards/${this.currentDashboard.id}/embed-code?${params}`);
+            const data = await res.json();
+
+            if (data.success) {
+              this.embedUrl = data.embed_url;
+
+              // Use responsive code if option is enabled
+              if (this.embedOptions.responsive) {
+                this.embedCode = data.responsive_code;
+              } else {
+                this.embedCode = data.iframe_code;
+              }
+            }
+          } catch (e) {
+            console.error('Failed to generate embed code:', e);
+            alert('❌ Error generating embed code:\n\n' + e.message);
+          }
+        },
+
+        async copyEmbedCode() {
+          try {
+            await navigator.clipboard.writeText(this.embedCode);
+            this.embedCopied = true;
+            this.showToast('Embed code copied to clipboard', 'success');
+
+            setTimeout(() => {
+              this.embedCopied = false;
+            }, 2000);
+          } catch (e) {
+            alert('❌ Failed to copy:\n\n' + e.message);
+          }
+        },
+
+        async copyEmbedUrl() {
+          try {
+            await navigator.clipboard.writeText(this.embedUrl);
+            this.showToast('Embed URL copied to clipboard', 'success');
+          } catch (e) {
+            alert('❌ Failed to copy:\n\n' + e.message);
           }
         },
 
