@@ -2509,6 +2509,36 @@ async def get_email_history(limit: int = 50, current_user: dict = Depends(get_cu
     history = get_email_history(limit)
     return {"success": True, "history": history}
 
+# ==================== INCREMENTAL REFRESH APIS ====================
+
+@app.get("/api/incremental/watermarks/{widget_id}")
+async def get_widget_watermark(widget_id: str, current_user: dict = Depends(get_current_user)):
+    """Get watermark data for a widget."""
+    from web.incremental_refresh import get_watermark
+    watermark = get_watermark(widget_id)
+    return {"success": True, "watermark": watermark}
+
+@app.delete("/api/incremental/watermarks/{widget_id}")
+async def clear_widget_watermark(widget_id: str, current_user: dict = Depends(get_current_user)):
+    """Clear watermark for a widget (force full refresh)."""
+    from web.incremental_refresh import clear_watermark
+    success = clear_watermark(widget_id)
+    return {"success": success, "message": "Watermark cleared" if success else "Watermark not found"}
+
+@app.post("/api/incremental/detect-columns")
+async def detect_timestamp_columns(rows: List[Dict[str, Any]], current_user: dict = Depends(get_current_user)):
+    """Detect timestamp columns from query results."""
+    from web.incremental_refresh import detect_timestamp_columns
+    columns = detect_timestamp_columns(rows)
+    return {"success": True, "timestamp_columns": columns}
+
+@app.get("/api/incremental/stats")
+async def get_incremental_stats(current_user: dict = Depends(get_current_user)):
+    """Get incremental refresh statistics."""
+    from web.incremental_refresh import get_watermark_stats
+    stats = get_watermark_stats()
+    return {"success": True, "stats": stats}
+
 class PreviewWidgetRequest(BaseModel):
     query: str
 
