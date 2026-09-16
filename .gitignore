@@ -35,4 +35,10 @@ warehouse/*.duckdb
 .env
 .env.local
 warehouse/.metadata/storage_mounts.json
+warehouse/.metadata/auth_config.json
+warehouse/.metadata/slack_config.json
+warehouse/.metadata/webhook_config.json
+warehouse/.metadata/brand_config.json
 *.log
+
+

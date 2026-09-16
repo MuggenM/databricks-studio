@@ -27,6 +27,7 @@ from web.auth import (
     get_user_by_username, list_users, create_user, update_user, reset_user_password,
     delete_user, record_user_login, COOKIE_NAME, get_db_connection, init_auth_db
 )
+from web import auth_frameworks
 from web.permissions import (
     can_user_access_catalog, can_user_manage_catalog, can_user_delete_catalog,
     delete_all_catalog_permissions, filter_catalogs_for_user,
@@ -465,6 +466,48 @@ async def update_settings_endpoint(
         return {"success": True, "message": "Settings updated successfully"}
     finally:
         conn.close()
+
+
+# ==============================================================================
+# AUTHENTICATION FRAMEWORKS & SSO (ADMIN ONLY)
+# ==============================================================================
+
+@app.get("/api/auth/frameworks/config")
+async def get_auth_frameworks_config(current_user: Dict[str, Any] = Depends(require_role(["admin"]))):
+    """Returns the current auth frameworks configuration with sensitive secrets masked."""
+    return auth_frameworks.get_public_config()
+
+
+@app.post("/api/auth/frameworks/config")
+async def save_auth_frameworks_config(
+    payload: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(require_role(["admin"]))
+):
+    """Saves authentication frameworks configuration, preserving masked secrets."""
+    success = auth_frameworks.save_config(payload)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save authentication configuration")
+    return {"success": True, "message": "Authentication framework settings saved successfully"}
+
+
+@app.post("/api/auth/frameworks/ldap/test")
+async def test_ldap_endpoint(
+    payload: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(require_role(["admin"]))
+):
+    """Tests LDAP server connectivity and TLS handshake."""
+    result = auth_frameworks.test_ldap_connection(payload)
+    return result
+
+
+@app.post("/api/auth/frameworks/oidc/test")
+async def test_oidc_endpoint(
+    payload: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(require_role(["admin"]))
+):
+    """Tests OpenID Connect Discovery metadata from issuer."""
+    result = auth_frameworks.test_oidc_discovery(payload)
+    return result
 
 
 # ==============================================================================

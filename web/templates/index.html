@@ -10875,7 +10875,7 @@
 
   <!-- Modal: Platform Governance Settings (Admin Only) -->
   <div x-show="showSettingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showSettingsModal = false">
-    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-xl shadow-2xl p-6 space-y-5" @click.outside="showSettingsModal = false" x-data="{ settingsTab: 'general' }">
+    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-3xl shadow-2xl p-6 space-y-5" @click.outside="showSettingsModal = false" x-data="{ settingsTab: 'general' }">
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-dbx-border pb-3">
         <div class="flex items-center space-x-3">
           <div class="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 text-lg">
@@ -10900,6 +10900,10 @@
         <button @click="settingsTab = 'governance'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'governance' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-shield-check mr-1.5"></i>
           Governance
+        </button>
+        <button @click="settingsTab = 'auth'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'auth' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+          <i class="ph ph-key mr-1.5"></i>
+          Authentication
         </button>
         <button @click="settingsTab = 'email'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'email' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-envelope mr-1.5"></i>
@@ -10999,6 +11003,294 @@
                 <i class="ph ph-shield-check"></i>
                 <span>Catalog Access</span>
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Authentication Tab -->
+        <div x-show="settingsTab === 'auth'" class="space-y-4" x-data="{ authSubTab: 'ldap' }">
+          <!-- Primary Authentication Provider Selector -->
+          <div class="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="font-bold text-slate-800 dark:text-white block text-xs flex items-center">
+                  <i class="ph ph-shield-star mr-1.5 text-indigo-600 dark:text-indigo-400"></i>
+                  Primary Authentication Framework
+                </span>
+                <span class="text-[11px] text-slate-500">Select which identity provider serves as the primary authentication engine</span>
+              </div>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold"
+                    :class="authConfig.primary_framework === 'ldap' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' :
+                            authConfig.primary_framework === 'oidc' ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' :
+                            authConfig.primary_framework === 'saml' ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300' :
+                            'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+                    x-text="authConfig.primary_framework">
+              </span>
+            </div>
+
+            <div class="grid grid-cols-4 gap-2">
+              <label class="flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition text-xs"
+                     :class="authConfig.primary_framework === 'local' ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-dbx-border hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'">
+                <input type="radio" value="local" x-model="authConfig.primary_framework" class="text-indigo-600">
+                <span>Local DB</span>
+              </label>
+              <label class="flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition text-xs"
+                     :class="authConfig.primary_framework === 'ldap' ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-dbx-border hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'">
+                <input type="radio" value="ldap" x-model="authConfig.primary_framework" class="text-indigo-600">
+                <span>LDAP / AD</span>
+              </label>
+              <label class="flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition text-xs"
+                     :class="authConfig.primary_framework === 'oidc' ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-dbx-border hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'">
+                <input type="radio" value="oidc" x-model="authConfig.primary_framework" class="text-indigo-600">
+                <span>OAuth / OIDC</span>
+              </label>
+              <label class="flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition text-xs"
+                     :class="authConfig.primary_framework === 'saml' ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-dbx-border hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'">
+                <input type="radio" value="saml" x-model="authConfig.primary_framework" class="text-indigo-600">
+                <span>SAML 2.0</span>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2.5 border-t border-slate-200 dark:border-dbx-border">
+              <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" x-model="authConfig.allow_local_fallback" class="w-4 h-4 text-indigo-600 rounded">
+                <span class="text-slate-700 dark:text-slate-300 text-[11px] font-medium">Emergency Local Admin Fallback Enabled</span>
+              </label>
+              <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" x-model="authConfig.auto_provision_users" class="w-4 h-4 text-indigo-600 rounded">
+                <span class="text-slate-700 dark:text-slate-300 text-[11px] font-medium">Auto-provision Users on First Login</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Framework Sub-navigation Pills -->
+          <div class="flex items-center space-x-2 border-b border-slate-200 dark:border-dbx-border pb-2.5">
+            <button type="button" @click="authSubTab = 'ldap'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5"
+                    :class="authSubTab === 'ldap' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'">
+              <i class="ph ph-tree-structure"></i>
+              <span>LDAP / Active Directory</span>
+              <span x-show="authConfig.ldap.enabled" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+            </button>
+            <button type="button" @click="authSubTab = 'oidc'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5"
+                    :class="authSubTab === 'oidc' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'">
+              <i class="ph ph-key"></i>
+              <span>OAuth 2.0 / OIDC</span>
+              <span x-show="authConfig.oidc.enabled" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+            </button>
+            <button type="button" @click="authSubTab = 'saml'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5"
+                    :class="authSubTab === 'saml' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'">
+              <i class="ph ph-identification-card"></i>
+              <span>SAML 2.0 Identity</span>
+              <span x-show="authConfig.saml.enabled" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+            </button>
+          </div>
+
+          <!-- SUB-TAB 1: LDAP / Active Directory -->
+          <div x-show="authSubTab === 'ldap'" class="space-y-3.5">
+            <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl">
+              <div>
+                <span class="font-bold text-slate-800 dark:text-white block text-xs">Enable LDAP / Active Directory Integration</span>
+                <span class="text-[11px] text-slate-500">Authenticate lakehouse users and sync role groups against corporate directory</span>
+              </div>
+              <input type="checkbox" x-model="authConfig.ldap.enabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+            </div>
+
+            <div class="grid grid-cols-12 gap-3">
+              <div class="col-span-6">
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">LDAP Server Host</label>
+                <input type="text" x-model="authConfig.ldap.server_host" placeholder="ldap.company.internal" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div class="col-span-3">
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Port</label>
+                <input type="number" x-model.number="authConfig.ldap.server_port" placeholder="389" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div class="col-span-3">
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Encryption</label>
+                <select x-model="authConfig.ldap.encryption" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+                  <option value="none">Plain (389)</option>
+                  <option value="starttls">StartTLS (389)</option>
+                  <option value="ssl">SSL / LDAPS (636)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Bind Service DN</label>
+                <input type="text" x-model="authConfig.ldap.bind_dn" placeholder="cn=lakehouse_svc,ou=Services,dc=company,dc=internal" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Bind Password</label>
+                <input type="password" x-model="authConfig.ldap.bind_password" placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Base Search DN</label>
+                <input type="text" x-model="authConfig.ldap.base_dn" placeholder="dc=company,dc=internal" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">User Filter Pattern</label>
+                <input type="text" x-model="authConfig.ldap.user_search_filter" placeholder="(&(objectClass=user)(sAMAccountName={username}))" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <!-- LDAP Role Mappings -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-dbx-border rounded-xl space-y-2">
+              <span class="font-bold text-slate-800 dark:text-white block text-[11px] uppercase tracking-wider text-slate-500">Directory Group to Studio Role Mappings</span>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Admin Group DN</label>
+                  <input type="text" x-model="authConfig.ldap.admin_group" placeholder="cn=DataAdmins,ou=Groups,dc=..." class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Power User Group DN</label>
+                  <input type="text" x-model="authConfig.ldap.power_user_group" placeholder="cn=DataEngineers,ou=Groups,dc=..." class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Default Fallback Role</label>
+                  <select x-model="authConfig.ldap.default_role" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <option value="user">User (Standard)</option>
+                    <option value="power_user">Power User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- LDAP Test Connection Action & Feedback -->
+            <div class="flex items-center justify-between pt-1">
+              <button type="button" @click="testLdapConnection()" :disabled="isTestingLdap"
+                      class="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                <i class="ph" :class="isTestingLdap ? 'ph-spinner animate-spin' : 'ph-plugs-connected'"></i>
+                <span>Test LDAP Connectivity</span>
+              </button>
+
+              <div x-show="ldapTestResult" class="text-xs flex items-center space-x-1.5 px-3 py-1 rounded-lg"
+                   :class="ldapTestResult?.success ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'">
+                <i class="ph" :class="ldapTestResult?.success ? 'ph-check-circle' : 'ph-warning-circle'"></i>
+                <span x-text="ldapTestResult?.message"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 2: OAuth 2.0 / OpenID Connect -->
+          <div x-show="authSubTab === 'oidc'" class="space-y-3.5">
+            <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl">
+              <div>
+                <span class="font-bold text-slate-800 dark:text-white block text-xs">Enable OpenID Connect (OIDC / OAuth 2.0) SSO</span>
+                <span class="text-[11px] text-slate-500">Integrate with Microsoft Entra ID, Okta, Keycloak, or Google Workspace</span>
+              </div>
+              <input type="checkbox" x-model="authConfig.oidc.enabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Provider Identity</label>
+                <input type="text" x-model="authConfig.oidc.provider_name" placeholder="Microsoft Entra ID / Okta" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Issuer URL (.well-known/openid-configuration)</label>
+                <input type="url" x-model="authConfig.oidc.issuer_url" placeholder="https://login.microsoftonline.com/common/v2.0" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Client ID</label>
+                <input type="text" x-model="authConfig.oidc.client_id" placeholder="00000000-0000-0000-0000-000000000000" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Client Secret</label>
+                <input type="password" x-model="authConfig.oidc.client_secret" placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Requested Scopes</label>
+                <input type="text" x-model="authConfig.oidc.scopes" placeholder="openid email profile groups" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">OAuth Redirect URI</label>
+                <input type="text" x-model="authConfig.oidc.redirect_uri" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-500 dark:text-slate-400 text-xs font-mono" readonly>
+              </div>
+            </div>
+
+            <!-- OIDC Claims & Roles -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-dbx-border rounded-xl space-y-2">
+              <span class="font-bold text-slate-800 dark:text-white block text-[11px] uppercase tracking-wider text-slate-500">ID Token Claim to Role Mapping</span>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Group / Role Claim Name</label>
+                  <input type="text" x-model="authConfig.oidc.admin_claim" placeholder="groups" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Admin Group Claim Value</label>
+                  <input type="text" x-model="authConfig.oidc.admin_value" placeholder="LakehouseAdmins" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-slate-500 mb-0.5 font-semibold">Power User Claim Value</label>
+                  <input type="text" x-model="authConfig.oidc.power_user_value" placeholder="DataEngineers" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+              </div>
+            </div>
+
+            <!-- OIDC Discovery Test Button & Feedback -->
+            <div class="flex items-center justify-between pt-1">
+              <button type="button" @click="testOidcDiscovery()" :disabled="isTestingOidc"
+                      class="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition">
+                <i class="ph" :class="isTestingOidc ? 'ph-spinner animate-spin' : 'ph-globe'"></i>
+                <span>Test OIDC Discovery</span>
+              </button>
+
+              <div x-show="oidcTestResult" class="text-xs flex items-center space-x-1.5 px-3 py-1 rounded-lg"
+                   :class="oidcTestResult?.success ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'">
+                <i class="ph" :class="oidcTestResult?.success ? 'ph-check-circle' : 'ph-warning-circle'"></i>
+                <span x-text="oidcTestResult?.message"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 3: SAML 2.0 Identity -->
+          <div x-show="authSubTab === 'saml'" class="space-y-3.5">
+            <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl">
+              <div>
+                <span class="font-bold text-slate-800 dark:text-white block text-xs">Enable SAML 2.0 Web SSO</span>
+                <span class="text-[11px] text-slate-500">Federate logins via corporate IdP (Ping, Shibboleth, Azure AD SAML)</span>
+              </div>
+              <input type="checkbox" x-model="authConfig.saml.enabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">SP Entity ID (Audience)</label>
+                <input type="text" x-model="authConfig.saml.entity_id" placeholder="urn:databricks:local:studio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">IdP Single Sign-On URL</label>
+                <input type="url" x-model="authConfig.saml.sso_url" placeholder="https://idp.company.internal/saml/sso" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">IdP Metadata XML / URL</label>
+                <input type="text" x-model="authConfig.saml.idp_metadata_url" placeholder="https://idp.company.internal/federationmetadata.xml" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Username Attribute URI</label>
+                <input type="text" x-model="authConfig.saml.attribute_username" placeholder="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">IdP Public X.509 Certificate (PEM)</label>
+              <textarea x-model="authConfig.saml.x509_cert" rows="2" placeholder="-----BEGIN CERTIFICATE-----&#10;MIIC...&#10;-----END CERTIFICATE-----" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-indigo-500"></textarea>
             </div>
           </div>
         </div>
@@ -12233,6 +12525,53 @@
           sender_name: 'Databricks Local Studio',
           enabled: false
         },
+        authConfig: {
+          primary_framework: 'local',
+          allow_local_fallback: true,
+          auto_provision_users: true,
+          ldap: {
+            enabled: false,
+            server_host: 'ldap.company.internal',
+            server_port: 389,
+            encryption: 'none',
+            base_dn: 'dc=company,dc=internal',
+            bind_dn: 'cn=lakehouse_svc,ou=Services,dc=company,dc=internal',
+            bind_password: '',
+            user_search_filter: '(&(objectClass=user)(sAMAccountName={username}))',
+            user_search_base: 'ou=Employees,dc=company,dc=internal',
+            group_search_base: 'ou=Groups,dc=company,dc=internal',
+            admin_group: 'cn=DataAdmins,ou=Groups,dc=company,dc=internal',
+            power_user_group: 'cn=DataEngineers,ou=Groups,dc=company,dc=internal',
+            default_role: 'user'
+          },
+          oidc: {
+            enabled: false,
+            provider_name: 'Microsoft Entra ID / Okta',
+            issuer_url: 'https://login.microsoftonline.com/common/v2.0',
+            client_id: '',
+            client_secret: '',
+            scopes: 'openid email profile groups',
+            redirect_uri: 'http://localhost:8891/api/auth/oidc/callback',
+            admin_claim: 'groups',
+            admin_value: 'LakehouseAdmins',
+            power_user_value: 'DataEngineers',
+            default_role: 'user'
+          },
+          saml: {
+            enabled: false,
+            idp_metadata_url: '',
+            entity_id: 'urn:databricks:local:studio',
+            sso_url: '',
+            x509_cert: '',
+            attribute_username: 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name',
+            attribute_email: 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+            default_role: 'user'
+          }
+        },
+        isTestingLdap: false,
+        ldapTestResult: null,
+        isTestingOidc: false,
+        oidcTestResult: null,
         slackConfig: {
           enabled: false,
           webhooks: [],
@@ -13627,7 +13966,8 @@
             this.loadEmailConfig ? this.loadEmailConfig() : Promise.resolve(),
             this.loadSlackConfig ? this.loadSlackConfig() : Promise.resolve(),
             this.loadWebhookConfig ? this.loadWebhookConfig() : Promise.resolve(),
-            this.loadBrandConfig ? this.loadBrandConfig() : Promise.resolve()
+            this.loadBrandConfig ? this.loadBrandConfig() : Promise.resolve(),
+            this.loadAuthConfig ? this.loadAuthConfig() : Promise.resolve()
           ]);
         },
 
@@ -14209,6 +14549,77 @@
           }
         },
 
+        // Authentication Frameworks Functions
+        async loadAuthConfig() {
+          try {
+            const res = await fetch('/api/auth/frameworks/config');
+            if (res.ok) {
+              const data = await res.json();
+              if (data) {
+                this.authConfig = {
+                  ...this.authConfig,
+                  ...data,
+                  ldap: { ...(this.authConfig.ldap || {}), ...(data.ldap || {}) },
+                  oidc: { ...(this.authConfig.oidc || {}), ...(data.oidc || {}) },
+                  saml: { ...(this.authConfig.saml || {}), ...(data.saml || {}) }
+                };
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load auth frameworks config:', e);
+          }
+        },
+
+        async saveAuthConfig() {
+          try {
+            const res = await fetch('/api/auth/frameworks/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.authConfig)
+            });
+            return res.ok;
+          } catch (e) {
+            console.error('Failed to save auth frameworks config:', e);
+            return false;
+          }
+        },
+
+        async testLdapConnection() {
+          this.isTestingLdap = true;
+          this.ldapTestResult = null;
+          try {
+            const res = await fetch('/api/auth/frameworks/ldap/test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.authConfig.ldap)
+            });
+            const data = await res.json();
+            this.ldapTestResult = data;
+          } catch (e) {
+            this.ldapTestResult = { success: false, message: 'Network error testing LDAP: ' + e.message };
+          } finally {
+            this.isTestingLdap = false;
+          }
+        },
+
+        async testOidcDiscovery() {
+          this.isTestingOidc = true;
+          this.oidcTestResult = null;
+          try {
+            const res = await fetch('/api/auth/frameworks/oidc/test', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.authConfig.oidc)
+            });
+            const data = await res.json();
+            this.oidcTestResult = data;
+          } catch (e) {
+            this.oidcTestResult = { success: false, message: 'Network error testing OIDC: ' + e.message };
+          } finally {
+            this.isTestingOidc = false;
+          }
+        },
+
         async saveSettings() {
           this.isSavingSettings = true;
           try {
@@ -14249,6 +14660,13 @@
             const res5 = await this.saveBrandConfig();
             if (!res5) {
               this.showToast('Settings saved, but brand config failed', 'warning');
+              return;
+            }
+
+            // Save authentication frameworks config
+            const resAuth = await this.saveAuthConfig();
+            if (!resAuth) {
+              this.showToast('Settings saved, but authentication config failed', 'warning');
               return;
             }
 
