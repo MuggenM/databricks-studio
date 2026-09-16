@@ -2650,6 +2650,162 @@ async def get_email_history(limit: int = 50, current_user: dict = Depends(get_cu
     history = get_email_history(limit)
     return {"success": True, "history": history}
 
+
+# ==================== SLACK INTEGRATION APIS ====================
+
+@app.get("/api/slack/config")
+async def get_slack_config(current_user: dict = Depends(require_role("admin"))):
+    """Get Slack configuration (admin only)."""
+    from web.slack_integration import load_config
+    config = load_config()
+    # Don't send webhook URLs to frontend for security
+    safe_config = config.copy()
+    safe_webhooks = []
+    for webhook in config.get("webhooks", []):
+        safe_webhook = webhook.copy()
+        if "webhook_url" in safe_webhook:
+            # Mask webhook URL
+            url = safe_webhook["webhook_url"]
+            if len(url) > 20:
+                safe_webhook["webhook_url"] = url[:10] + "..." + url[-10:]
+            else:
+                safe_webhook["webhook_url"] = "***"
+        safe_webhooks.append(safe_webhook)
+    safe_config["webhooks"] = safe_webhooks
+    return {"success": True, "config": safe_config}
+
+
+@app.post("/api/slack/config")
+async def update_slack_config(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update Slack configuration (admin only)."""
+    from web.slack_integration import load_config, save_config
+    data = await request.json()
+
+    config = load_config()
+
+    # Update allowed fields
+    if "enabled" in data:
+        config["enabled"] = data["enabled"]
+    if "default_webhook" in data:
+        config["default_webhook"] = data["default_webhook"]
+    if "mention_users" in data:
+        config["mention_users"] = data["mention_users"]
+    if "include_charts" in data:
+        config["include_charts"] = data["include_charts"]
+
+    from web.slack_integration import save_config
+    if save_config(config):
+        return {"success": True, "message": "Slack configuration updated"}
+    else:
+        return {"success": False, "error": "Failed to save configuration"}
+
+
+@app.post("/api/slack/webhooks")
+async def create_slack_webhook(request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Add a new Slack webhook (admin only)."""
+    from web.slack_integration import add_webhook
+    data = await request.json()
+
+    result = add_webhook(
+        name=data.get("name", ""),
+        webhook_url=data.get("webhook_url", ""),
+        channel=data.get("channel", "#general"),
+        description=data.get("description", "")
+    )
+
+    return result
+
+
+@app.put("/api/slack/webhooks/{webhook_id}")
+async def update_slack_webhook_endpoint(webhook_id: str, request: Request, current_user: dict = Depends(require_role("admin"))):
+    """Update a Slack webhook (admin only)."""
+    from web.slack_integration import update_webhook
+    data = await request.json()
+
+    result = update_webhook(webhook_id, data)
+    return result
+
+
+@app.delete("/api/slack/webhooks/{webhook_id}")
+async def delete_slack_webhook(webhook_id: str, current_user: dict = Depends(require_role("admin"))):
+    """Delete a Slack webhook (admin only)."""
+    from web.slack_integration import remove_webhook
+    result = remove_webhook(webhook_id)
+    return result
+
+
+@app.get("/api/slack/webhooks")
+async def list_slack_webhooks(current_user: dict = Depends(get_current_user)):
+    """List all Slack webhooks."""
+    from web.slack_integration import get_webhooks
+    webhooks = get_webhooks()
+
+    # Mask webhook URLs for security
+    safe_webhooks = []
+    for webhook in webhooks:
+        safe_webhook = webhook.copy()
+        if "webhook_url" in safe_webhook:
+            url = safe_webhook["webhook_url"]
+            if len(url) > 20:
+                safe_webhook["webhook_url"] = url[:10] + "..." + url[-10:]
+            else:
+                safe_webhook["webhook_url"] = "***"
+        safe_webhooks.append(safe_webhook)
+
+    return {"success": True, "webhooks": safe_webhooks}
+
+
+@app.post("/api/slack/test/{webhook_id}")
+async def test_slack_webhook_endpoint(webhook_id: str, current_user: dict = Depends(require_role("admin"))):
+    """Test a Slack webhook (admin only)."""
+    from web.slack_integration import get_webhook, test_webhook
+
+    webhook = get_webhook(webhook_id)
+    if not webhook:
+        return {"success": False, "error": "Webhook not found"}
+
+    result = test_webhook(webhook["webhook_url"])
+    return result
+
+
+@app.post("/api/slack/notify")
+async def send_slack_notification(request: Request, current_user: dict = Depends(get_current_user)):
+    """Send a notification to Slack."""
+    from web.slack_integration import send_notification
+    data = await request.json()
+
+    result = send_notification(
+        message=data.get("message", ""),
+        webhook_id=data.get("webhook_id"),
+        title=data.get("title"),
+        fields=data.get("fields"),
+        color=data.get("color", "#36a64f"),
+        footer=data.get("footer")
+    )
+
+    return result
+
+
+@app.post("/api/slack/alert")
+async def send_slack_alert(request: Request, current_user: dict = Depends(get_current_user)):
+    """Send an alert to Slack."""
+    from web.slack_integration import send_alert
+    data = await request.json()
+
+    result = send_alert(
+        alert_name=data.get("alert_name", ""),
+        condition=data.get("condition", ""),
+        current_value=data.get("current_value"),
+        threshold=data.get("threshold"),
+        dashboard_name=data.get("dashboard_name"),
+        query_name=data.get("query_name"),
+        severity=data.get("severity", "warning"),
+        webhook_id=data.get("webhook_id")
+    )
+
+    return result
+
+
 # ==================== INCREMENTAL REFRESH APIS ====================
 
 @app.get("/api/incremental/watermarks/{widget_id}")

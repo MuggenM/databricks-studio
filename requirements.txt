@@ -13,3 +13,4 @@ python-multipart>=0.0.9
 croniter>=6.0.0
 papermill>=2.6.0
 APScheduler>=3.10.0
+requests>=2.31.0
