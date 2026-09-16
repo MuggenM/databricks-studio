@@ -1124,11 +1124,6 @@
             <i class="ph ph-cpu text-base text-amber-700 dark:text-amber-400"></i>
             <span>Compute & Engine</span>
           </button>
-          <button x-show="currentUser?.role === 'admin'" @click="currentView = 'settings'; loadEmailConfig(); loadSlackConfig(); loadWebhookConfig(); loadBrandConfig();" :class="currentView === 'settings' ? 'bg-slate-100 dark:bg-dbx-hover text-slate-900 dark:text-white border-l-2 border-slate-600 dark:border-slate-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dbx-panel dark:hover:text-slate-200'" class="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-r text-xs transition text-left">
-            <i class="ph ph-gear text-base text-slate-600 dark:text-slate-400"></i>
-            <span class="flex-1">Platform Settings</span>
-            <span class="text-[9px] px-1 py-0.2 bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 rounded border border-red-300/80 dark:border-red-800/80 font-mono font-semibold">ADMIN</span>
-          </button>
         </div>
       </div>
 
@@ -10880,7 +10875,7 @@
 
   <!-- Modal: Platform Governance Settings (Admin Only) -->
   <div x-show="showSettingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.window="showSettingsModal = false">
-    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5" @click.outside="showSettingsModal = false" x-data="{ settingsTab: 'general' }">
+    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-xl shadow-2xl p-6 space-y-5" @click.outside="showSettingsModal = false" x-data="{ settingsTab: 'general' }">
       <div class="flex items-center justify-between border-b border-slate-200 dark:border-dbx-border pb-3">
         <div class="flex items-center space-x-3">
           <div class="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 text-lg">
@@ -10888,7 +10883,7 @@
           </div>
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-white">Platform Settings & Governance</h3>
-            <p class="text-xs text-slate-500">Configure global studio security and catalog access defaults</p>
+            <p class="text-xs text-slate-500">Configure global studio security, catalog access defaults, and governance policies</p>
           </div>
         </div>
         <button @click="showSettingsModal = false" class="text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm">
@@ -10898,19 +10893,23 @@
 
       <!-- Tab Navigation -->
       <div class="flex border-b border-slate-200 dark:border-dbx-border -mx-6 px-6">
-        <button @click="settingsTab = 'general'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'general' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+        <button @click="settingsTab = 'general'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'general' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-gear-six mr-1.5"></i>
           General
         </button>
-        <button @click="settingsTab = 'email'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'email' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+        <button @click="settingsTab = 'governance'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'governance' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+          <i class="ph ph-shield-check mr-1.5"></i>
+          Governance
+        </button>
+        <button @click="settingsTab = 'email'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'email' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-envelope mr-1.5"></i>
           Email
         </button>
-        <button @click="settingsTab = 'integrations'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'integrations' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+        <button @click="settingsTab = 'integrations'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'integrations' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-share-network mr-1.5"></i>
           Integrations
         </button>
-        <button @click="settingsTab = 'branding'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'branding' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+        <button @click="settingsTab = 'branding'" class="px-3.5 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'branding' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
           <i class="ph ph-palette mr-1.5"></i>
           Branding
         </button>
@@ -10924,17 +10923,83 @@
             <input type="text" x-model="platformSettings.app_name" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500">
           </div>
 
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Default SQL Warehouse</label>
+            <select x-model="platformSettings.default_warehouse_id" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+              <template x-for="w in sqlWarehouses" :key="w.id">
+                <option :value="w.id" x-text="w.name + ' (' + w.cluster_size + ')'" :selected="w.id === platformSettings.default_warehouse_id"></option>
+              </template>
+            </select>
+            <p class="text-[10px] text-slate-500 mt-1">Default compute cluster selected for new Monaco SQL Editor sessions</p>
+          </div>
+
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Default Query Limit</label>
+            <select x-model.number="platformSettings.default_query_limit" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+              <option :value="100">100 rows</option>
+              <option :value="500">500 rows</option>
+              <option :value="1000">1,000 rows</option>
+              <option :value="5000">5,000 rows</option>
+            </select>
+            <p class="text-[10px] text-slate-500 mt-1">Default maximum rows fetched for interactive queries and previews</p>
+          </div>
+        </div>
+
+        <!-- Governance Tab -->
+        <div x-show="settingsTab === 'governance'" class="space-y-4">
           <div class="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl flex items-center justify-between">
             <div class="space-y-0.5 pr-4">
-              <span class="font-bold text-slate-800 dark:text-white block">Public Default Warehouse</span>
-              <span class="text-[11px] text-slate-500 block">Allow all users to query and read tables in the default warehouse without explicit grants.</span>
+              <span class="font-bold text-slate-800 dark:text-white block flex items-center">
+                <i class="ph ph-globe mr-1.5 text-amber-500"></i>
+                Public Default Warehouse Access
+              </span>
+              <span class="text-[11px] text-slate-500 block">Allow all authenticated users to query and read tables in the default warehouse without explicit grants.</span>
             </div>
             <input type="checkbox" x-model="platformSettings.allow_public_read" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
           </div>
 
           <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Default Catalog Authorization Tier</label>
+            <select x-model="platformSettings.default_catalog_permission" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer">
+              <option value="READ">READ - Allow querying and sampling tables</option>
+              <option value="NONE">NONE - Require explicit owner or admin grant</option>
+              <option value="WRITE">WRITE - Allow creating and modifying tables</option>
+            </select>
+            <p class="text-[10px] text-slate-500 mt-1">Default permission assigned to standard users on new catalogs</p>
+          </div>
+
+          <div>
             <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">JWT Session Timeout (Hours)</label>
-            <input type="number" min="1" max="720" x-model.number="platformSettings.session_timeout_hours" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500">
+            <input type="number" min="1" max="720" x-model.number="platformSettings.session_timeout_hours" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
+            <p class="text-[10px] text-slate-500 mt-1">Session token validity duration before re-authentication is required</p>
+          </div>
+
+          <div class="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl flex items-center justify-between">
+            <div class="space-y-0.5 pr-4">
+              <span class="font-bold text-slate-800 dark:text-white block flex items-center">
+                <i class="ph ph-clock-counter-clockwise mr-1.5 text-blue-500"></i>
+                Universal Audit Trail Logging
+              </span>
+              <span class="text-[11px] text-slate-500 block">Record all SQL executions, DDL mutations, and notebook queries into the history database.</span>
+            </div>
+            <input type="checkbox" x-model="platformSettings.audit_logging_enabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+
+          <!-- Governance Direct Shortcuts -->
+          <div class="pt-3 border-t border-slate-200 dark:border-dbx-border flex items-center justify-between">
+            <div class="text-[11px] text-slate-500">
+              Manage users or catalog ACL grants:
+            </div>
+            <div class="flex items-center space-x-2">
+              <button type="button" @click="showSettingsModal = false; openIamModal();" class="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-100 transition text-[11px] font-semibold flex items-center space-x-1">
+                <i class="ph ph-users-three"></i>
+                <span>IAM Users</span>
+              </button>
+              <button type="button" @click="showSettingsModal = false; showCatalogPermissionsModal = true; fetchCatalogPermissions('warehouse');" class="px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 transition text-[11px] font-semibold flex items-center space-x-1">
+                <i class="ph ph-shield-check"></i>
+                <span>Catalog Access</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -12150,7 +12215,15 @@
 
         // Platform Settings State
         showSettingsModal: false,
-        platformSettings: { app_name: 'Localspark Lakehouse Studio', allow_public_read: true, session_timeout_hours: 24 },
+        platformSettings: { 
+          app_name: 'Databricks Local Studio', 
+          allow_public_read: true, 
+          session_timeout_hours: 24,
+          default_catalog_permission: 'READ',
+          audit_logging_enabled: true,
+          default_warehouse_id: 'wh_starter',
+          default_query_limit: 500
+        },
         emailConfig: {
           smtp_server: 'smtp.gmail.com',
           smtp_port: 587,
@@ -13549,7 +13622,13 @@
 
         async openSettingsModal() {
           this.showSettingsModal = true;
-          await this.fetchSettings();
+          await Promise.allSettled([
+            this.fetchSettings(),
+            this.loadEmailConfig ? this.loadEmailConfig() : Promise.resolve(),
+            this.loadSlackConfig ? this.loadSlackConfig() : Promise.resolve(),
+            this.loadWebhookConfig ? this.loadWebhookConfig() : Promise.resolve(),
+            this.loadBrandConfig ? this.loadBrandConfig() : Promise.resolve()
+          ]);
         },
 
         async fetchSettings() {
