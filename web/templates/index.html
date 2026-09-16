@@ -10884,36 +10884,51 @@
         </button>
       </div>
 
-      <form @submit.prevent="saveSettings()" class="space-y-4 text-xs">
-        <div>
-          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Studio Application Name</label>
-          <input type="text" x-model="platformSettings.app_name" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500">
-        </div>
+      <!-- Tab Navigation -->
+      <div class="flex border-b border-slate-200 dark:border-dbx-border -mx-6 px-6" x-data="{ settingsTab: 'general' }">
+        <button @click="settingsTab = 'general'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'general' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+          <i class="ph ph-gear-six mr-1.5"></i>
+          General
+        </button>
+        <button @click="settingsTab = 'email'" class="px-4 py-2.5 text-xs font-semibold border-b-2 transition" :class="settingsTab === 'email' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-300'">
+          <i class="ph ph-envelope mr-1.5"></i>
+          Email
+        </button>
+      </div>
 
-        <div class="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl flex items-center justify-between">
-          <div class="space-y-0.5 pr-4">
-            <span class="font-bold text-slate-800 dark:text-white block">Public Default Warehouse</span>
-            <span class="text-[11px] text-slate-500 block">Allow all users to query and read tables in the default warehouse without explicit grants.</span>
+      <form @submit.prevent="saveSettings()" class="space-y-5 text-xs">
+        <!-- General Tab -->
+        <div x-show="settingsTab === 'general'" class="space-y-4">
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Studio Application Name</label>
+            <input type="text" x-model="platformSettings.app_name" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500">
           </div>
-          <input type="checkbox" x-model="platformSettings.allow_public_read" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+
+          <div class="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl flex items-center justify-between">
+            <div class="space-y-0.5 pr-4">
+              <span class="font-bold text-slate-800 dark:text-white block">Public Default Warehouse</span>
+              <span class="text-[11px] text-slate-500 block">Allow all users to query and read tables in the default warehouse without explicit grants.</span>
+            </div>
+            <input type="checkbox" x-model="platformSettings.allow_public_read" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+
+          <div>
+            <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">JWT Session Timeout (Hours)</label>
+            <input type="number" min="1" max="720" x-model.number="platformSettings.session_timeout_hours" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500">
+          </div>
         </div>
 
-        <div>
-          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">JWT Session Timeout (Hours)</label>
-          <input type="number" min="1" max="720" x-model.number="platformSettings.session_timeout_hours" required class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500">
-        </div>
-
-        <!-- Email Server Configuration -->
-        <div class="border-t border-slate-200 dark:border-dbx-border pt-4 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h4 class="font-bold text-slate-800 dark:text-white text-sm">📧 Email Server Configuration</h4>
-              <p class="text-[11px] text-slate-500">Configure SMTP for email reports and notifications</p>
+        <!-- Email Tab -->
+        <div x-show="settingsTab === 'email'" class="space-y-4">
+          <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border rounded-xl">
+            <div class="space-y-0.5">
+              <span class="font-bold text-slate-800 dark:text-white block flex items-center">
+                <i class="ph ph-envelope mr-2"></i>
+                Email Server Enabled
+              </span>
+              <span class="text-[11px] text-slate-500 block">Configure SMTP for email reports and notifications</span>
             </div>
-            <div class="flex items-center space-x-2">
-              <input type="checkbox" x-model="emailConfig.enabled" id="emailEnabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
-              <label for="emailEnabled" class="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">Enabled</label>
-            </div>
+            <input type="checkbox" x-model="emailConfig.enabled" id="emailEnabled" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -10940,7 +10955,7 @@
             <div class="col-span-2">
               <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">SMTP Password / App Password</label>
               <input type="password" x-model="emailConfig.sender_password" placeholder="••••••••••••••••" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
-              <p class="text-[10px] text-slate-500 mt-1">For Gmail: Use App Password from https://myaccount.google.com/apppasswords</p>
+              <p class="text-[10px] text-slate-500 mt-1">For Gmail: Use App Password from <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-indigo-500 hover:text-indigo-600">myaccount.google.com/apppasswords</a></p>
             </div>
 
             <div class="col-span-2">
