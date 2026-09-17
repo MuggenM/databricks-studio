@@ -1478,6 +1478,94 @@ async def execute_sql(payload: QueryRequest, request: Request):
             "executed_by": fallback_note
         }
 
+
+@app.post("/api/sql/export/parquet")
+async def export_sql_parquet_endpoint(payload: Dict[str, Any], request: Request):
+    """Export SQL query results or active query execution to an Apache Parquet binary file."""
+    rows = payload.get("rows", [])
+    query = payload.get("query", "").strip()
+    filename = payload.get("filename", "").strip()
+    
+    if not filename:
+        filename = f"query_result_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
+    if not filename.endswith(".parquet"):
+        filename += ".parquet"
+
+    # Strategy 1: If rows are provided from the UI table
+    if rows:
+        import pandas as pd
+        import duckdb
+        import tempfile
+        try:
+            def do_export_rows():
+                df = pd.DataFrame(rows)
+                c = duckdb.connect()
+                with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+                    tmp_path = tmp.name
+                try:
+                    c.execute(f"COPY df TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION SNAPPY);")
+                    with open(tmp_path, "rb") as f:
+                        return f.read()
+                finally:
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.remove(tmp_path)
+                        except Exception:
+                            pass
+            
+            data = await asyncio.to_thread(do_export_rows)
+            from fastapi.responses import Response
+            return Response(
+                content=data,
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Length": str(len(data))
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error exporting rows to parquet: {e}")
+            if not query:
+                raise HTTPException(status_code=500, detail=f"Failed to export Parquet: {e}")
+
+    # Strategy 2: If query is provided, execute COPY via active DuckDB session
+    if query:
+        import tempfile
+        try:
+            def do_export_query():
+                conn = get_duckrun_conn()
+                raw_conn = getattr(conn, "con", conn)
+                clean_q = query.rstrip("; \t\n")
+                with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+                    tmp_path = tmp.name
+                try:
+                    raw_conn.execute(f"COPY ({clean_q}) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION SNAPPY);")
+                    with open(tmp_path, "rb") as f:
+                        return f.read()
+                finally:
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.remove(tmp_path)
+                        except Exception:
+                            pass
+
+            data = await asyncio.to_thread(do_export_query)
+            from fastapi.responses import Response
+            return Response(
+                content=data,
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Length": str(len(data))
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error exporting query to parquet: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to export query to Parquet: {e}")
+
+    raise HTTPException(status_code=400, detail="No rows or query provided to export")
+
+
 @app.post("/api/sql/profile")
 async def profile_sql(payload: QueryRequest, request: Request):
     query = payload.query.strip()

@@ -1700,9 +1700,19 @@
                 <div x-show="activeCatalogTab === 'preview'" class="space-y-2">
                   <div class="flex justify-between items-center text-xs text-slate-400 mb-2">
                     <span>Showing first 50 rows via vectorized DuckDB execution</span>
-                    <button @click="fetchTablePreview(selectedTable.schema_name, selectedTable.table_name)" class="text-xs px-2 py-1 bg-dbx-panel hover:bg-dbx-hover rounded border border-dbx-border text-slate-300">
-                      <i class="ph ph-arrows-clockwise mr-1"></i>Re-fetch
-                    </button>
+                    <div class="flex items-center space-x-2">
+                      <button @click="exportTablePreviewCSV()" x-show="tablePreview && tablePreview.rows && tablePreview.rows.length > 0" title="Export preview as CSV" class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-dbx-border text-[11px] transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600">
+                        <i class="ph ph-file-csv text-emerald-600 dark:text-emerald-400"></i>
+                        <span>Export CSV</span>
+                      </button>
+                      <button @click="exportTablePreviewParquet()" x-show="tablePreview && tablePreview.rows && tablePreview.rows.length > 0" :disabled="isExportingTableParquet" title="Export preview as Apache Parquet" class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-dbx-border text-[11px] transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600 disabled:opacity-50">
+                        <i class="ph" :class="isExportingTableParquet ? 'ph-spinner animate-spin text-amber-500' : 'ph-file-archive text-amber-600 dark:text-amber-400'"></i>
+                        <span x-text="isExportingTableParquet ? 'Exporting...' : 'Export Parquet'"></span>
+                      </button>
+                      <button @click="fetchTablePreview(selectedTable.schema_name, selectedTable.table_name)" class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-dbx-panel hover:bg-slate-200 dark:hover:bg-dbx-hover rounded border border-slate-200 dark:border-dbx-border text-slate-700 dark:text-slate-300 transition">
+                        <i class="ph ph-arrows-clockwise mr-1"></i>Re-fetch
+                      </button>
+                    </div>
                   </div>
                   <div class="border border-dbx-border rounded-lg overflow-x-auto bg-dbx-panel">
                     <table class="w-full text-left text-xs divide-y divide-dbx-border">
@@ -2363,10 +2373,14 @@
             </div>
 
             <template x-if="activeSqlTab === 'table' && queryResult && queryResult.rows && queryResult.rows.length > 0">
-              <div class="shrink-0 ml-2">
-                <button @click="exportCSV()" class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-dbx-border text-[11px] transition shadow-xs">
-                  <i class="ph ph-download-simple"></i>
+              <div class="shrink-0 ml-2 flex items-center space-x-1.5">
+                <button @click="exportCSV()" title="Export query results as CSV" class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-dbx-border text-[11px] transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600">
+                  <i class="ph ph-file-csv text-emerald-600 dark:text-emerald-400"></i>
                   <span>Export CSV</span>
+                </button>
+                <button @click="exportParquet()" :disabled="isExportingParquet" title="Export query results as Apache Parquet (Snappy compressed)" class="flex items-center space-x-1 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-dbx-border text-[11px] transition shadow-xs hover:border-slate-300 dark:hover:border-slate-600 disabled:opacity-50">
+                  <i class="ph" :class="isExportingParquet ? 'ph-spinner animate-spin text-amber-500' : 'ph-file-archive text-amber-600 dark:text-amber-400'"></i>
+                  <span x-text="isExportingParquet ? 'Exporting...' : 'Export Parquet'"></span>
                 </button>
               </div>
             </template>
@@ -13062,6 +13076,10 @@
           return text;
         },
 
+        // Query Result Exporting State
+        isExportingParquet: false,
+        isExportingTableParquet: false,
+
         // Storage Federation & DB Mounts State
         showMountStorageModal: false,
         mountFormTab: 'postgres', // 'postgres' | 's3' | 'sqlite'
@@ -16701,8 +16719,7 @@
         },
 
         async runQuery() {
-          if (!window._monacoEditor) return;
-          const query = window._monacoEditor.getValue().trim();
+          const query = (window._monacoEditor ? window._monacoEditor.getValue() : (this.sqlQuery || '')).trim();
           if (!query) return;
 
           this.isExecuting = true;
@@ -16806,8 +16823,121 @@
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `query_result_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.csv`;
+          const filename = `query_result_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.csv`;
+          a.download = filename;
+          document.body.appendChild(a);
           a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          this.showToast(`CSV export downloaded: ${filename}`, 'success');
+        },
+
+        async exportParquet() {
+          if (!this.queryResult || !this.queryResult.rows || this.queryResult.rows.length === 0) {
+            this.showToast('No query data available to export', 'warning');
+            return;
+          }
+          this.isExportingParquet = true;
+          try {
+            const payload = {
+              query: this.sqlQuery || '',
+              rows: this.queryResult.rows,
+              columns: this.queryResult.columns || []
+            };
+
+            const res = await fetch('/api/sql/export/parquet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              const contentDisposition = res.headers.get('Content-Disposition');
+              let filename = `query_result_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.parquet`;
+              if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match) filename = match[1];
+              }
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+              this.showToast(`Parquet export downloaded: ${filename}`, 'success');
+            } else {
+              const err = await res.json().catch(() => ({ detail: 'Parquet export failed' }));
+              this.showToast('Parquet export failed: ' + (err.detail || 'Server error'), 'error');
+            }
+          } catch (e) {
+            console.error('Error exporting Parquet:', e);
+            this.showToast('Export error: ' + e.message, 'error');
+          } finally {
+            this.isExportingParquet = false;
+          }
+        },
+
+        exportTablePreviewCSV() {
+          if (!this.tablePreview || !this.tablePreview.rows || this.tablePreview.rows.length === 0) return;
+          const cols = this.tablePreview.columns.map(c => c.name);
+          const rows = this.tablePreview.rows;
+          let csv = cols.join(',') + '\n';
+          rows.forEach(r => {
+            csv += cols.map(c => JSON.stringify(r[c] ?? '')).join(',') + '\n';
+          });
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const tblName = this.selectedTable ? `${this.selectedTable.schema_name}_${this.selectedTable.table_name}` : 'table_preview';
+          const filename = `${tblName}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.csv`;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          this.showToast(`CSV export downloaded: ${filename}`, 'success');
+        },
+
+        async exportTablePreviewParquet() {
+          if (!this.tablePreview || !this.tablePreview.rows || this.tablePreview.rows.length === 0) return;
+          this.isExportingTableParquet = true;
+          try {
+            const tblName = this.selectedTable ? `${this.selectedTable.schema_name}_${this.selectedTable.table_name}` : 'table_preview';
+            const filename = `${tblName}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '_')}.parquet`;
+            const payload = {
+              rows: this.tablePreview.rows,
+              columns: this.tablePreview.columns || [],
+              filename: filename
+            };
+            const res = await fetch('/api/sql/export/parquet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+              this.showToast(`Parquet export downloaded: ${filename}`, 'success');
+            } else {
+              const err = await res.json().catch(() => ({ detail: 'Export failed' }));
+              this.showToast('Export failed: ' + (err.detail || 'Server error'), 'error');
+            }
+          } catch (e) {
+            this.showToast('Export error: ' + e.message, 'error');
+          } finally {
+            this.isExportingTableParquet = false;
+          }
         },
 
         // ==================== SAVED QUERIES LIBRARY METHODS ====================
