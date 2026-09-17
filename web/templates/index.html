@@ -1320,19 +1320,47 @@
               <p class="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
                 Select columns below to partition this Delta table. Partitioning creates Hive-style physical subdirectories (<code class="text-amber-600 dark:text-amber-300 font-mono">col=value/*.parquet</code>), enabling Ray workers to execute parallel Map-Reduce scans without lock contention.
               </p>
+              <div class="flex items-center space-x-2 text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                <i class="ph ph-info text-xs"></i>
+                <span>Color-coded by partition suitability:</span>
+                <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 font-semibold">Best</span>
+                <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 font-semibold">Good</span>
+                <span class="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300 font-semibold">Fair</span>
+                <span class="px-1.5 py-0.5 rounded bg-lime-100 text-lime-800 dark:bg-lime-950/60 dark:text-lime-300 font-semibold">OK</span>
+              </div>
 
               <!-- Column Chips to Select -->
               <div class="flex flex-wrap gap-2 pt-0.5">
                 <template x-for="col in ingestData?.columns" :key="col.name">
-                  <button type="button" 
+                  <button type="button"
                           @click="toggleIngestPartition(col.name)"
-                          :class="ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name) 
-                            ? 'bg-amber-50 border-amber-500 text-amber-900 dark:bg-amber-950/80 dark:border-amber-500 dark:text-amber-200 font-semibold ring-1 ring-amber-400 shadow-xs' 
-                            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500'"
+                          :class="{
+                            // Selected state
+                            'bg-amber-50 border-amber-500 text-amber-900 dark:bg-amber-950/80 dark:border-amber-500 dark:text-amber-200 font-semibold ring-1 ring-amber-400 shadow-xs': ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name),
+                            // Top partition candidates (when not selected)
+                            'bg-red-50 border-red-400 dark:bg-red-950/40 dark:border-red-700 ring-1 ring-red-300 dark:ring-red-800': !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)) && col.partition_rank === 1,
+                            'bg-orange-50 border-orange-400 dark:bg-orange-950/40 dark:border-orange-700 ring-1 ring-orange-300 dark:ring-orange-800': !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)) && col.partition_rank === 2,
+                            'bg-yellow-50 border-yellow-400 dark:bg-yellow-950/40 dark:border-yellow-700 ring-1 ring-yellow-300 dark:ring-yellow-800': !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)) && col.partition_rank === 3,
+                            'bg-lime-50 border-lime-400 dark:bg-lime-950/40 dark:border-lime-700 ring-1 ring-lime-300 dark:ring-lime-800': !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)) && col.partition_rank === 4,
+                            // Default unselected
+                            'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500': !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)) && (!col.partition_rank || col.partition_rank > 4)
+                          }"
                           class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs border transition cursor-pointer">
                     <i :class="ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name) ? 'ph-check-circle text-amber-600 dark:text-amber-400 font-bold' : 'ph-circles-three text-slate-400'" class="ph text-xs"></i>
                     <span x-text="col.name" class="font-mono"></span>
                     <span class="text-[10px] opacity-60 font-mono" x-text="'(' + col.type + ')'"></span>
+                    <!-- Show partition score for top candidates -->
+                    <template x-if="col.partition_rank && col.partition_rank <= 4 && !(ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name))">
+                      <span class="ml-1 text-[9px] px-1 py-0.2 rounded font-bold"
+                            :class="{
+                              'bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-100': col.partition_rank === 1,
+                              'bg-orange-200 text-orange-900 dark:bg-orange-900 dark:text-orange-100': col.partition_rank === 2,
+                              'bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100': col.partition_rank === 3,
+                              'bg-lime-200 text-lime-900 dark:bg-lime-900 dark:text-lime-100': col.partition_rank === 4
+                            }"
+                            x-text="'★' + col.partition_score.toFixed(0)"></span>
+                    </template>
+                    <!-- Show selection order when selected -->
                     <template x-if="ingestForm.partition_columns && ingestForm.partition_columns.includes(col.name)">
                       <span class="ml-1 text-[9px] px-1 py-0.2 bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 rounded font-bold"
                             x-text="'#' + (ingestForm.partition_columns.indexOf(col.name) + 1)"></span>

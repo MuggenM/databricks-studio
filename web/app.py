@@ -1720,6 +1720,89 @@ def sanitize_identifier(name: str) -> str:
         s = 'table_' + s
     return s
 
+def analyze_partition_suitability(df: pd.DataFrame, conn) -> List[Dict[str, Any]]:
+    """
+    Analyzes columns to determine partition suitability.
+    Returns list of columns with partition_score and partition_rank.
+    """
+    column_scores = []
+
+    for col in df.columns:
+        try:
+            dtype = str(df[col].dtype)
+            distinct_count = int(df[col].nunique())
+            total_rows = len(df)
+            cardinality_ratio = distinct_count / max(total_rows, 1)
+
+            # Base score starts at 0
+            score = 0.0
+
+            # Type scoring (higher is better for partitioning)
+            if 'datetime' in dtype or 'timestamp' in dtype:
+                score += 100  # Excellent - dates are ideal for partitioning
+            elif 'date' in dtype:
+                score += 95
+            elif 'object' in dtype or 'string' in dtype:
+                # String types - depends on cardinality
+                if distinct_count <= 20:
+                    score += 80  # Good - low cardinality categories
+                elif distinct_count <= 100:
+                    score += 60  # Moderate - medium cardinality
+                else:
+                    score += 20  # Poor - high cardinality
+            elif 'int' in dtype:
+                if distinct_count <= 50:
+                    score += 70  # Good for low cardinality integers
+                elif distinct_count <= 500:
+                    score += 40
+                else:
+                    score += 10
+            elif 'bool' in dtype:
+                score += 75  # Good - binary partition
+            else:
+                score += 30  # Float or other types - less ideal
+
+            # Cardinality penalty/bonus
+            if cardinality_ratio < 0.01:  # Less than 1% unique
+                score += 30  # Bonus for very low cardinality
+            elif cardinality_ratio < 0.05:  # Less than 5% unique
+                score += 20
+            elif cardinality_ratio < 0.2:  # Less than 20% unique
+                score += 10
+            elif cardinality_ratio > 0.8:  # More than 80% unique
+                score -= 40  # Penalty for very high cardinality
+
+            # Check for common partition column name patterns
+            col_lower = str(col).lower()
+            if any(pattern in col_lower for pattern in ['date', 'year', 'month', 'day', 'time']):
+                score += 25
+            elif any(pattern in col_lower for pattern in ['region', 'country', 'state', 'category', 'type', 'status']):
+                score += 15
+            elif col_lower in ['id', 'uuid', 'guid']:
+                score -= 50  # IDs are typically bad partition keys
+
+            column_scores.append({
+                'name': str(col),
+                'distinct_count': distinct_count,
+                'cardinality_ratio': round(cardinality_ratio, 4),
+                'partition_score': round(score, 2)
+            })
+        except Exception as e:
+            logger.warning(f"Failed to analyze column {col}: {e}")
+            column_scores.append({
+                'name': str(col),
+                'distinct_count': 0,
+                'cardinality_ratio': 0,
+                'partition_score': 0
+            })
+
+    # Sort by score descending and assign ranks
+    column_scores.sort(key=lambda x: x['partition_score'], reverse=True)
+    for idx, col_score in enumerate(column_scores, 1):
+        col_score['partition_rank'] = idx
+
+    return column_scores
+
 @app.post("/api/ingest/preview")
 async def ingest_preview(file: UploadFile = File(...)):
     filename = file.filename or "uploaded_data.csv"
@@ -1752,7 +1835,26 @@ async def ingest_preview(file: UploadFile = File(...)):
         count_res = conn.sql(f"SELECT COUNT(*) FROM {source_sql}").fetchone()
         total_rows = int(count_res[0]) if count_res else int(len(df))
 
-        columns = [{"name": str(col), "type": str(df[col].dtype)} for col in df.columns]
+        # Analyze partition suitability
+        partition_analysis = analyze_partition_suitability(df, conn)
+
+        # Merge partition analysis with column info
+        columns = []
+        for col in df.columns:
+            col_analysis = next((p for p in partition_analysis if p['name'] == str(col)), None)
+            col_info = {
+                "name": str(col),
+                "type": str(df[col].dtype)
+            }
+            if col_analysis:
+                col_info.update({
+                    "partition_score": col_analysis['partition_score'],
+                    "partition_rank": col_analysis['partition_rank'],
+                    "distinct_count": col_analysis['distinct_count'],
+                    "cardinality_ratio": col_analysis['cardinality_ratio']
+                })
+            columns.append(col_info)
+
         sample_rows = [json_serializable_row(row) for row in df.to_dict(orient="records")]
 
         suggested_name = sanitize_identifier(os.path.splitext(filename)[0])
