@@ -1,0 +1,35 @@
+version: 2
+sources:
+- name: lakehouse
+  description: Primary Localspark Delta Lakehouse tables in warehouse.dbo
+  meta:
+    external_location: delta_scan('/workspace/warehouse/dbo/{name}')
+  tables:
+  - name: silver_employees
+    description: Curated employees table with departments and compensation
+    columns:
+    - name: name
+      tests:
+      - unique
+      - not_null
+    - name: salary
+      tests:
+      - not_null
+  - name: dim_products
+    description: Product inventory dimensions with SKU pricing and stock counts
+    columns:
+    - name: product_id
+      tests:
+      - unique
+      - not_null
+    - name: stock_qty
+    - name: price
+  - name: nyse_tickers
+    description: NYSE publicly traded tickers and market capitalization
+    columns:
+    - name: ticker
+      tests:
+      - unique
+      - not_null
+  - name: gold_telemetry_kpis
+    description: Aggregated IoT sensor telemetry KPIs per device

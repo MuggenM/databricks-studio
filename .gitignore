@@ -1,0 +1,45 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Jupyter & Checkpoints
+.ipynb_checkpoints/
+.duckrun_spill/
+
+# dbt Artifacts & Compilation Cache
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+dbt_project/*.duckdb
+
+# SQLite Ephemeral Files
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Temporary / Scratch Catalogs (preserves empty folder)
+warehouse/catalogs/*
+!warehouse/catalogs/.gitkeep
+
+# Ephemeral DuckDB Session DBs
+warehouse/*.duckdb
+
+# Environment Local Secrets
+.env
+.env.local
+warehouse/.metadata/storage_mounts.json
+warehouse/.metadata/auth_config.json
+warehouse/.metadata/slack_config.json
+warehouse/.metadata/webhook_config.json
+warehouse/.metadata/brand_config.json
+*.log
+
+
+warehouse/

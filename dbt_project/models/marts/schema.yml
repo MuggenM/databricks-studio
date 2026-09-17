@@ -1,0 +1,26 @@
+version: 2
+models:
+- name: fct_department_payroll
+  description: Aggregated department headcount, salary distribution, and total payroll
+  columns:
+  - name: department
+    description: Primary key / Department identifier
+    tests:
+    - unique
+    - not_null
+  - name: total_headcount
+    tests:
+    - not_null
+  - name: total_payroll
+    tests: []
+- name: fct_inventory_health
+  description: Category-level inventory valuations and stock health warnings
+  columns:
+  - name: category
+    description: Product category
+    tests:
+    - unique
+    - not_null
+  - name: total_inventory_valuation
+    tests:
+    - not_null

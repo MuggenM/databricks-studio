@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ dashboard.get('name', 'Dashboard') }}</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+  <!-- Phosphor Icons -->
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/regular/style.css">
+
+  <style>
+    /* Minimal embedded view styles */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .dark {
+      background: #0b111e;
+      color: white;
+    }
+
+    /* Auto theme detection */
+    @media (prefers-color-scheme: dark) {
+      html[data-theme="auto"] {
+        background: #0b111e;
+        color: white;
+      }
+    }
+  </style>
+</head>
+<body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+      x-data="embedDashboard()"
+      x-init="init()">
+
+  <!-- Minimal Header -->
+  <div class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <i class="ph ph-chart-line-up text-xl text-indigo-600"></i>
+      <h1 class="text-sm font-bold" x-text="dashboard.name"></h1>
+    </div>
+    <div class="flex items-center space-x-2 text-xs text-slate-500">
+      <span x-show="lastRefreshed">
+        Last updated: <span x-text="formatTime(lastRefreshed)"></span>
+      </span>
+      <button @click="refreshDashboard()" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+        <i class="ph ph-arrow-clockwise"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div class="p-4">
+    <!-- Loading State -->
+    <div x-show="isLoading" class="flex items-center justify-center h-64">
+      <div class="text-center">
+        <i class="ph ph-spinner text-4xl animate-spin text-indigo-600"></i>
+        <p class="text-sm text-slate-500 mt-2">Loading dashboard...</p>
+      </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div x-show="!isLoading" class="grid grid-cols-12 gap-4">
+      <template x-for="widget in dashboard.widgets" :key="widget.id">
+        <div :class="getWidgetGridClass(widget)"
+             class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm">
+
+          <!-- Widget Header -->
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1">
+              <h3 class="font-semibold text-sm" x-text="widget.title"></h3>
+              <p x-show="widget.description" class="text-xs text-slate-500 mt-1" x-text="widget.description"></p>
+            </div>
+          </div>
+
+          <!-- Widget Content -->
+          <div :id="'widget-' + widget.id" class="widget-content"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function embedDashboard() {
+      return {
+        dashboard: {{ dashboard | tojson }},
+        isLoading: true,
+        lastRefreshed: null,
+        chartInstances: {},
+
+        async init() {
+          // Apply theme
+          const theme = '{{ theme }}';
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+          }
+          // 'auto' uses system preference via media query
+
+          await this.loadDashboard();
+        },
+
+        async loadDashboard() {
+          this.isLoading = true;
+
+          try {
+            // Execute all widget queries
+            for (const widget of this.dashboard.widgets) {
+              await this.executeWidget(widget);
+            }
+
+            this.lastRefreshed = new Date();
+          } catch (e) {
+            console.error('Error loading dashboard:', e);
+          } finally {
+            this.isLoading = false;
+          }
+        },
+
+        async executeWidget(widget) {
+          try {
+            // Execute query (simplified - you may need to adjust based on your API)
+            const response = await fetch('/api/query/execute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sql: widget.sql,
+                warehouse_id: this.dashboard.warehouse_id
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              widget.result = data.result;
+
+              // Render widget
+              await this.$nextTick();
+              this.renderWidget(widget);
+            }
+          } catch (e) {
+            console.error('Error executing widget:', e);
+          }
+        },
+
+        renderWidget(widget) {
+          const container = document.getElementById('widget-' + widget.id);
+          if (!container) return;
+
+          const type = widget.visualization_type || 'table';
+
+          if (type === 'table') {
+            this.renderTable(container, widget);
+          } else if (type === 'counter') {
+            this.renderCounter(container, widget);
+          } else {
+            this.renderChart(container, widget);
+          }
+        },
+
+        renderTable(container, widget) {
+          if (!widget.result || !widget.result.rows) return;
+
+          const rows = widget.result.rows;
+          const columns = widget.result.columns || Object.keys(rows[0] || {});
+
+          let html = '<div class="overflow-x-auto"><table class="w-full text-xs">';
+          html += '<thead class="bg-slate-50 dark:bg-slate-800"><tr>';
+          columns.forEach(col => {
+            html += `<th class="px-3 py-2 text-left font-semibold">${col}</th>`;
+          });
+          html += '</tr></thead><tbody>';
+
+          rows.slice(0, 100).forEach((row, i) => {
+            html += `<tr class="${i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}">`;
+            columns.forEach(col => {
+              html += `<td class="px-3 py-2">${row[col] ?? ''}</td>`;
+            });
+            html += '</tr>';
+          });
+
+          html += '</tbody></table></div>';
+          container.innerHTML = html;
+        },
+
+        renderCounter(container, widget) {
+          if (!widget.result || !widget.result.rows || !widget.result.rows[0]) return;
+
+          const row = widget.result.rows[0];
+          const value = Object.values(row)[0];
+
+          container.innerHTML = `
+            <div class="text-center py-8">
+              <div class="text-4xl font-bold text-indigo-600">${this.formatNumber(value)}</div>
+            </div>
+          `;
+        },
+
+        renderChart(container, widget) {
+          const chart = echarts.init(container, document.documentElement.classList.contains('dark') ? 'dark' : null);
+          this.chartInstances[widget.id] = chart;
+
+          // Basic chart configuration (simplified)
+          const option = {
+            tooltip: { trigger: 'axis' },
+            grid: { left: 50, right: 20, top: 20, bottom: 40 },
+            xAxis: { type: 'category', data: [] },
+            yAxis: { type: 'value' },
+            series: [{ type: 'bar', data: [] }]
+          };
+
+          // Populate with data
+          if (widget.result && widget.result.rows) {
+            const rows = widget.result.rows;
+            const columns = Object.keys(rows[0] || {});
+
+            if (columns.length >= 2) {
+              option.xAxis.data = rows.map(r => r[columns[0]]);
+              option.series[0].data = rows.map(r => r[columns[1]]);
+            }
+          }
+
+          chart.setOption(option);
+
+          // Resize on window resize
+          window.addEventListener('resize', () => chart.resize());
+        },
+
+        async refreshDashboard() {
+          await this.loadDashboard();
+        },
+
+        getWidgetGridClass(widget) {
+          const width = widget.width || 6;
+          return `col-span-${Math.min(width, 12)}`;
+        },
+
+        formatTime(date) {
+          return new Date(date).toLocaleTimeString();
+        },
+
+        formatNumber(num) {
+          if (typeof num !== 'number') return num;
+          return num.toLocaleString();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
