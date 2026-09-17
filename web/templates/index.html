@@ -10583,7 +10583,7 @@
             </div>
             <div>
               <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Endpoint</label>
-              <input type="text" x-model="mountForm.s3_endpoint" placeholder="garage:3900" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+              <input type="text" x-model="mountForm.s3_endpoint" placeholder="duckdb-studio-garage:3900" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
             </div>
             <div>
               <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Region</label>
@@ -10611,18 +10611,18 @@
         </div>
 
         <!-- Test Results Feedback Box -->
-        <div x-show="mountTestResult" class="p-3 rounded-lg border text-xs" :class="mountTestResult?.success ? 'bg-emerald-950/50 border-emerald-700/60 text-emerald-300' : 'bg-red-950/50 border-red-700/60 text-red-300'">
+        <div x-show="mountTestResult" class="p-3 rounded-lg border text-xs" :class="mountTestResult?.success ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/50 border-red-300 dark:border-red-700/60 text-red-800 dark:text-red-300'">
           <div class="flex items-center space-x-2 font-bold">
-            <i class="ph text-base" :class="mountTestResult?.success ? 'ph-check-circle text-emerald-400' : 'ph-x-circle text-red-400'"></i>
+            <i class="ph text-base" :class="mountTestResult?.success ? 'ph-check-circle text-emerald-600 dark:text-emerald-400' : 'ph-x-circle text-red-600 dark:text-red-400'"></i>
             <span x-text="mountTestResult?.success ? 'Connection Successful!' : 'Connection Failed'"></span>
           </div>
-          <p class="mt-1 text-[11px]" x-text="mountTestResult?.message || mountTestResult?.error"></p>
-          <div x-show="mountTestResult?.tables?.length > 0" class="mt-2 pt-2 border-t border-emerald-800/40 font-mono text-[10px] text-emerald-200">
-            <span>Discovered tables: </span>
+          <p class="mt-1 text-[11px] leading-relaxed break-words" x-text="mountTestResult?.message || mountTestResult?.error"></p>
+          <div x-show="mountTestResult?.tables?.length > 0" class="mt-2 pt-2 border-t border-emerald-300 dark:border-emerald-800/40 font-mono text-[10px] text-emerald-700 dark:text-emerald-200">
+            <span class="font-bold">Discovered tables: </span>
             <span x-text="mountTestResult?.tables?.join(', ') || ''"></span>
           </div>
-          <div x-show="mountTestResult?.files?.length > 0" class="mt-2 pt-2 border-t border-emerald-800/40 font-mono text-[10px] text-emerald-200">
-            <span>Discovered S3 files: </span>
+          <div x-show="mountTestResult?.files?.length > 0" class="mt-2 pt-2 border-t border-emerald-300 dark:border-emerald-800/40 font-mono text-[10px] text-emerald-700 dark:text-emerald-200">
+            <span class="font-bold">Discovered S3 files: </span>
             <span x-text="mountTestResult?.files?.join(', ') || ''"></span>
           </div>
         </div>
@@ -10649,15 +10649,15 @@
       </div>
 
       <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-dbx-border">
-        <button @click="testMountConnection()" :disabled="isTestingMount" type="button" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 rounded text-xs font-semibold flex items-center space-x-1.5 transition">
+        <button @click="testMountConnection()" :disabled="isTestingMount || isSavingMount" type="button" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 rounded text-xs font-semibold flex items-center space-x-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <i class="ph" :class="isTestingMount ? 'ph-spinner animate-spin' : 'ph-plug'"></i>
-          <span>Test Connection</span>
+          <span x-text="isTestingMount ? 'Testing...' : 'Test Connection'"></span>
         </button>
         <div class="flex items-center space-x-2">
           <button @click="showMountStorageModal = false" type="button" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 text-xs rounded transition">Cancel</button>
-          <button @click="saveMount()" :disabled="isSavingMount" type="button" class="px-4 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition">
+          <button @click="saveMount()" :disabled="isSavingMount || isTestingMount" type="button" class="px-4 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white text-xs font-semibold rounded shadow flex items-center space-x-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed">
             <i class="ph" :class="isSavingMount ? 'ph-spinner animate-spin' : 'ph-check'"></i>
-            <span>Save & Mount Catalog</span>
+            <span x-text="isSavingMount ? 'Saving & Mounting...' : 'Save & Mount Catalog'"></span>
           </button>
         </div>
       </div>
@@ -21567,6 +21567,8 @@
         async testMountConnection() {
           this.isTestingMount = true;
           this.mountTestResult = null;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 16000);
           try {
             let config = {};
             if (this.mountFormTab === 'postgres') {
@@ -21602,11 +21604,18 @@
             const res = await fetch('/api/mounts/test', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(payload),
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
             this.mountTestResult = await res.json();
           } catch (e) {
-            this.mountTestResult = { success: false, error: e.message };
+            clearTimeout(timeoutId);
+            if (e.name === 'AbortError') {
+              this.mountTestResult = { success: false, error: 'Connection test timed out after 16 seconds. Please check endpoint address and network reachability.' };
+            } else {
+              this.mountTestResult = { success: false, error: e.message };
+            }
           } finally {
             this.isTestingMount = false;
           }
@@ -21623,6 +21632,8 @@
           }
 
           this.isSavingMount = true;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
           try {
             let config = {};
             if (this.mountFormTab === 'postgres') {
@@ -21661,8 +21672,10 @@
             const res = await fetch('/api/mounts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(payload),
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             if (res.ok) {
               this.showToast(`Storage mount '${payload.name}' attached successfully`, 'success');
@@ -21674,8 +21687,13 @@
               this.showToast('Save mount failed: ' + (err.detail || 'Server error'), 'error');
             }
           } catch (e) {
-            console.error('Error saving mount:', e);
-            this.showToast('Save mount error: ' + e.message, 'error');
+            clearTimeout(timeoutId);
+            if (e.name === 'AbortError') {
+              this.showToast('Save mount timed out after 20 seconds.', 'error');
+            } else {
+              console.error('Error saving mount:', e);
+              this.showToast('Save mount error: ' + e.message, 'error');
+            }
           } finally {
             this.isSavingMount = false;
           }

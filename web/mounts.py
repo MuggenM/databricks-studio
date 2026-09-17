@@ -91,12 +91,19 @@ def delete_mount(mount_id: str) -> bool:
 def get_s3_storage_options(config: Dict[str, Any]) -> Dict[str, str]:
     """Generates standard AWS/S3 storage options dictionary for deltalake.DeltaTable and write_deltalake."""
     endpoint = config.get("endpoint", "garage:3900").strip()
-    if not endpoint.startswith("http://") and not endpoint.startswith("https://"):
-        protocol = "https://" if config.get("use_ssl", False) else "http://"
-        endpoint = f"{protocol}{endpoint}"
+    use_ssl = bool(config.get("use_ssl", False))
+    if endpoint.lower().startswith("https://"):
+        use_ssl = True
+        endpoint = endpoint[8:]
+    elif endpoint.lower().startswith("http://"):
+        use_ssl = False
+        endpoint = endpoint[7:]
+    endpoint = endpoint.rstrip("/")
+    protocol = "https://" if use_ssl else "http://"
+    full_endpoint = f"{protocol}{endpoint}"
 
     return {
-        "AWS_ENDPOINT_URL": endpoint,
+        "AWS_ENDPOINT_URL": full_endpoint,
         "AWS_ACCESS_KEY_ID": config.get("key_id", ""),
         "AWS_SECRET_ACCESS_KEY": config.get("secret", ""),
         "AWS_REGION": config.get("region", "us-east-1"),
@@ -109,7 +116,10 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
     """Tests connection to an external storage mount using an ephemeral DuckDB connection."""
     m_type = mount_data.get("type", "").lower().strip()
     config = mount_data.get("config", {})
-    catalog_name = mount_data.get("catalog_name", "test_mount").strip().lower().replace("-", "_")
+    raw_catalog = mount_data.get("catalog_name", "test_mount").strip().lower()
+    catalog_name = "".join(c if (c.isalnum() or c == "_") else "_" for c in raw_catalog)
+    if not catalog_name:
+        catalog_name = "test_mount"
 
     test_conn = duckdb.connect()
     try:
@@ -122,8 +132,8 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
             
             test_conn.execute("INSTALL postgres; LOAD postgres;")
             attach_sql = (
-                f"ATTACH 'dbname={database} host={host} port={port} user={user} password={password}' "
-                f"AS {catalog_name} (TYPE postgres, READ_ONLY true);"
+                f"ATTACH 'dbname={database} host={host} port={port} user={user} password={password} connect_timeout=5' "
+                f"AS \"{catalog_name}\" (TYPE postgres, READ_ONLY true);"
             )
             test_conn.execute(attach_sql)
             
@@ -147,14 +157,24 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
             bucket = config.get("bucket", "").strip()
             endpoint = config.get("endpoint", "127.0.0.1:9000").strip()
             url_style = config.get("url_style", "path").strip()
-            use_ssl = "true" if config.get("use_ssl", False) else "false"
+            use_ssl_bool = bool(config.get("use_ssl", False))
+            if endpoint.lower().startswith("https://"):
+                use_ssl_bool = True
+                endpoint = endpoint[8:]
+            elif endpoint.lower().startswith("http://"):
+                use_ssl_bool = False
+                endpoint = endpoint[7:]
+            endpoint = endpoint.rstrip("/")
+            use_ssl = "true" if use_ssl_bool else "false"
             region = config.get("region", "us-east-1").strip()
             key_id = config.get("key_id", "").strip()
             secret = config.get("secret", "").strip()
 
             test_conn.execute("INSTALL httpfs; LOAD httpfs;")
+            test_conn.execute("SET http_timeout = 5; SET http_retries = 1; SET http_keep_alive = false;")
+            secret_name = f"test_{uuid.uuid4().hex[:8]}"
             secret_sql = f"""
-            CREATE SECRET {catalog_name}_test (
+            CREATE SECRET "{secret_name}" (
                 TYPE S3,
                 KEY_ID '{key_id}',
                 SECRET '{secret}',
@@ -174,7 +194,7 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "success": True,
                 "type": "s3",
-                "message": f"Successfully connected to S3/Garage endpoint '{endpoint}' bucket '{bucket}'.",
+                "message": f"Successfully connected to S3/Garage endpoint '{endpoint}' bucket '{bucket}'. ({len(file_list)} object(s) found)",
                 "files": file_list,
                 "file_count": len(file_list)
             }
@@ -187,7 +207,7 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
                     "error": f"SQLite database file does not exist at path '{path}'"
                 }
             test_conn.execute("INSTALL sqlite; LOAD sqlite;")
-            test_conn.execute(f"ATTACH '{path}' AS {catalog_name} (TYPE sqlite, READ_ONLY true);")
+            test_conn.execute(f"ATTACH '{path}' AS \"{catalog_name}\" (TYPE sqlite, READ_ONLY true);")
             tables = test_conn.execute(
                 f"SELECT table_name FROM information_schema.tables WHERE table_catalog = '{catalog_name}'"
             ).fetchall()
@@ -204,7 +224,12 @@ def test_mount_connection(mount_data: Dict[str, Any]) -> Dict[str, Any]:
 
     except Exception as e:
         logger.warning(f"Test mount failed for {m_type}: {e}")
-        return {"success": False, "error": str(e)}
+        err_str = str(e)
+        if "Invalid signature" in err_str or "403 Forbidden" in err_str:
+            err_str = f"Access denied (403): Invalid Key ID or Secret for endpoint '{config.get('endpoint')}'. Please verify your credentials."
+        elif "Timeout was reached" in err_str or "Could not resolve host" in err_str or "Connection refused" in err_str:
+            err_str = f"Network connection failed to '{config.get('endpoint')}'. Ensure host and port are reachable from the studio container."
+        return {"success": False, "error": err_str}
     finally:
         try:
             test_conn.close()
@@ -220,7 +245,8 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
     raw_conn = getattr(conn, "con", conn)
     m_type = mount.get("type", "").lower().strip()
     config = mount.get("config", {})
-    catalog_name = mount.get("catalog_name", "").strip().lower().replace("-", "_")
+    raw_catalog = mount.get("catalog_name", "").strip().lower()
+    catalog_name = "".join(c if (c.isalnum() or c == "_") else "_" for c in raw_catalog)
     read_only = mount.get("read_only", True)
     ro_str = "true" if read_only else "false"
 
@@ -242,8 +268,8 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
             password = config.get("password", "")
             
             attach_sql = (
-                f"ATTACH 'dbname={database} host={host} port={port} user={user} password={password}' "
-                f"AS {catalog_name} (TYPE postgres, READ_ONLY {ro_str});"
+                f"ATTACH 'dbname={database} host={host} port={port} user={user} password={password} connect_timeout=5' "
+                f"AS \"{catalog_name}\" (TYPE postgres, READ_ONLY {ro_str});"
             )
             raw_conn.execute(attach_sql)
             logger.info(f"Successfully attached PostgreSQL mount '{catalog_name}'")
@@ -251,16 +277,25 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
 
         elif m_type == "s3":
             raw_conn.execute("INSTALL httpfs; LOAD httpfs;")
+            raw_conn.execute("SET http_timeout = 5; SET http_retries = 1; SET http_keep_alive = false;")
             bucket = config.get("bucket", "").strip()
             endpoint = config.get("endpoint", "127.0.0.1:9000").strip()
             url_style = config.get("url_style", "path").strip()
-            use_ssl = "true" if config.get("use_ssl", False) else "false"
+            use_ssl_bool = bool(config.get("use_ssl", False))
+            if endpoint.lower().startswith("https://"):
+                use_ssl_bool = True
+                endpoint = endpoint[8:]
+            elif endpoint.lower().startswith("http://"):
+                use_ssl_bool = False
+                endpoint = endpoint[7:]
+            endpoint = endpoint.rstrip("/")
+            use_ssl = "true" if use_ssl_bool else "false"
             region = config.get("region", "us-east-1").strip()
             key_id = config.get("key_id", "").strip()
             secret = config.get("secret", "").strip()
 
             secret_sql = f"""
-            CREATE SECRET IF NOT EXISTS {catalog_name} (
+            CREATE SECRET IF NOT EXISTS "{catalog_name}" (
                 TYPE S3,
                 KEY_ID '{key_id}',
                 SECRET '{secret}',
@@ -290,15 +325,15 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
             dbs_now = [row[0] for row in raw_conn.execute("SELECT database_name FROM duckdb_databases()").fetchall()]
             if catalog_name not in dbs_now:
                 try:
-                    raw_conn.execute(f"ATTACH ':memory:' AS {catalog_name};")
+                    raw_conn.execute(f"ATTACH ':memory:' AS \"{catalog_name}\";")
                 except Exception as e_mem:
                     logger.warning(f"Could not ATTACH ':memory:' AS {catalog_name}: {e_mem}")
 
             # 3. Create schemas inside the attached catalog
             try:
-                raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.dbo;")
+                raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS \"{catalog_name}\".dbo;")
                 if bucket:
-                    raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.{bucket};")
+                    raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS \"{catalog_name}\".\"{bucket}\";")
             except Exception as e_sch:
                 logger.debug(f"Could not create schemas in {catalog_name}: {e_sch}")
 
@@ -323,12 +358,12 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
                         tbl = parts[0]
 
                     try:
-                        raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {catalog_name}.{sch};")
-                        raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}.{sch}.{tbl} AS SELECT * FROM delta_scan('{table_path}');")
+                        raw_conn.execute(f"CREATE SCHEMA IF NOT EXISTS \"{catalog_name}\".\"{sch}\";")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".\"{sch}\".\"{tbl}\" AS SELECT * FROM delta_scan('{table_path}');")
                         if sch != "dbo":
-                            raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}.dbo.{tbl} AS SELECT * FROM delta_scan('{table_path}');")
-                        raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}_{sch}_{tbl} AS SELECT * FROM delta_scan('{table_path}');")
-                        raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}_{tbl} AS SELECT * FROM delta_scan('{table_path}');")
+                            raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".dbo.\"{tbl}\" AS SELECT * FROM delta_scan('{table_path}');")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}_{sch}_{tbl}\" AS SELECT * FROM delta_scan('{table_path}');")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}_{tbl}\" AS SELECT * FROM delta_scan('{table_path}');")
                     except Exception as e_v:
                         logger.debug(f"View creation notice for Delta table {table_path}: {e_v}")
             except Exception as e_dt:
@@ -343,10 +378,10 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
                         continue
                     base_name = os.path.basename(file_path).replace(".parquet", "").replace("-", "_").replace(".", "_")
                     try:
-                        raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}.dbo.{base_name} AS SELECT * FROM read_parquet('{file_path}');")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".dbo.\"{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
                         if bucket:
-                            raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}.{bucket}.{base_name} AS SELECT * FROM read_parquet('{file_path}');")
-                        raw_conn.execute(f"CREATE OR REPLACE VIEW {catalog_name}_{base_name} AS SELECT * FROM read_parquet('{file_path}');")
+                            raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".\"{bucket}\".\"{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}_{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
                     except Exception:
                         pass
             except Exception as e_pq:

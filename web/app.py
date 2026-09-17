@@ -5270,10 +5270,20 @@ async def create_or_update_mount_endpoint(payload: Dict[str, Any], request: Requ
     try:
         payload_copy = dict(payload)
         payload_copy["owner"] = current_user.get("username", "admin")
-        res = create_or_update_mount(payload_copy)
-        # Re-sync active duckrun connection
-        conn = get_duckrun_conn()
-        sync_catalogs_with_duckrun(conn)
+        res = await asyncio.to_thread(create_or_update_mount, payload_copy)
+        # Re-sync active duckrun connection asynchronously with a timeout
+        def do_sync():
+            try:
+                conn = get_duckrun_conn()
+                sync_catalogs_with_duckrun(conn)
+            except Exception as e_s:
+                logger.warning(f"Catalog sync warning after mount: {e_s}")
+
+        try:
+            await asyncio.wait_for(asyncio.to_thread(do_sync), timeout=12.0)
+        except Exception as e_sync:
+            logger.warning(f"Mount sync timeout or notice: {e_sync}")
+
         return {"success": True, "mount": res}
     except Exception as e:
         logger.error(f"Error creating/updating mount: {e}")
@@ -5288,7 +5298,8 @@ async def delete_mount_endpoint(mount_id: str, request: Request):
         current_user = {"role": "admin", "username": "admin", "id": "u_admin_01"}
 
     from web.mounts import load_mounts, delete_mount
-    target = next((m for m in load_mounts() if m["id"] == mount_id), None)
+    mounts = await asyncio.to_thread(load_mounts)
+    target = next((m for m in mounts if m["id"] == mount_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Mount not found")
 
@@ -5296,7 +5307,7 @@ async def delete_mount_endpoint(mount_id: str, request: Request):
         raise HTTPException(status_code=403, detail="Access denied: only administrators or the mount owner can delete this mount.")
 
     try:
-        ok = delete_mount(mount_id)
+        ok = await asyncio.to_thread(delete_mount, mount_id)
         if not ok:
             raise HTTPException(status_code=404, detail="Mount not found")
         return {"success": True, "deleted_id": mount_id}
@@ -5311,8 +5322,16 @@ async def delete_mount_endpoint(mount_id: str, request: Request):
 async def test_mount_endpoint(payload: Dict[str, Any]):
     from web.mounts import test_mount_connection
     try:
-        res = test_mount_connection(payload)
+        res = await asyncio.wait_for(
+            asyncio.to_thread(test_mount_connection, payload),
+            timeout=15.0
+        )
         return res
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "error": "Connection test timed out after 15 seconds. Please check the network endpoint and host accessibility."
+        }
     except Exception as e:
         logger.error(f"Error testing mount: {e}")
         return {"success": False, "error": str(e)}
