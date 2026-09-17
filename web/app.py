@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import duckdb
 import duckrun
-from deltalake import DeltaTable
+from deltalake import DeltaTable, write_deltalake
 import asyncio
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -1779,6 +1779,7 @@ class IngestCommitRequest(BaseModel):
     schema_name: str = "dbo"
     table_name: str
     mode: str = "overwrite" # overwrite | append
+    partition_columns: Optional[List[str]] = None
 
 @app.post("/api/ingest/create")
 async def ingest_create(payload: IngestCommitRequest, request: Request):
@@ -1807,6 +1808,18 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Validate and filter partition columns against source schema
+    raw_partitions = payload.partition_columns or []
+    valid_partition_cols = []
+    if raw_partitions and payload.mode.lower() != "append":
+        try:
+            source_desc = conn.sql(f"DESCRIBE SELECT * FROM {source_sql}").fetchall()
+            available_cols = [r[0] for r in source_desc]
+            valid_partition_cols = [c for c in raw_partitions if c in available_cols]
+        except Exception as e:
+            logger.warning(f"Could not validate partition columns: {e}")
+            valid_partition_cols = [c.strip() for c in raw_partitions if c and c.strip()]
+
     schema_clean = sanitize_identifier(payload.schema_name or "dbo")
     table_clean = sanitize_identifier(payload.table_name)
     target_catalog = payload.catalog or "warehouse"
@@ -1824,7 +1837,6 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
             m_type = cat.get("type")
             if m_type == "s3":
                 from web.mounts import get_s3_storage_options, attach_mount_to_duckdb
-                from deltalake import write_deltalake, DeltaTable
 
                 cfg = cat.get("config", {})
                 bucket = cfg.get("bucket", "localspark")
@@ -1839,10 +1851,12 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
 
                 mode = "append" if payload.mode.lower() == "append" else "overwrite"
                 schema_mode = "merge" if mode == "append" else "overwrite"
-                write_deltalake(s3_table_uri, arrow_table, storage_options=storage_options, mode=mode, schema_mode=schema_mode)
+                partition_by = valid_partition_cols if valid_partition_cols else None
+                write_deltalake(s3_table_uri, arrow_table, storage_options=storage_options, mode=mode, schema_mode=schema_mode, partition_by=partition_by)
 
                 dt = DeltaTable(s3_table_uri, storage_options=storage_options)
                 version = dt.version()
+                actual_partitions = list(dt.metadata().partition_columns or []) if hasattr(dt, "metadata") else (partition_by or [])
                 elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
                 # Remove temp uploaded file
@@ -1860,7 +1874,8 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
                 except Exception as e:
                     logger.debug(f"Notice registering S3 delta view: {e}")
 
-                query = f"-- Materialized Delta Lake Table in S3: {s3_table_uri}\nCREATE OR REPLACE TABLE {target_rel} (Delta v{version}, {row_count} rows)"
+                part_msg = f" (Partitioned by: {', '.join(actual_partitions)})" if actual_partitions else ""
+                query = f"-- Materialized Delta Lake Table in S3: {s3_table_uri}\nCREATE OR REPLACE TABLE {target_rel} (Delta v{version}, {row_count} rows{part_msg})"
                 log_query(
                     query_text=query,
                     duration_ms=elapsed_ms,
@@ -1891,8 +1906,9 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
                     "location": s3_table_uri,
                     "version": version,
                     "rows_ingested": row_count,
+                    "partition_columns": actual_partitions,
                     "elapsed_ms": elapsed_ms,
-                    "message": f"Successfully created Delta table {target_rel} on S3 bucket '{bucket}' with {row_count} rows (Version {version})"
+                    "message": f"Successfully created Delta table {target_rel} on S3 bucket '{bucket}' with {row_count} rows (Version {version}){part_msg}"
                 }
             else:
                 raise HTTPException(status_code=400, detail=f"Ingestion into external mount type '{m_type}' is not supported for Delta table creation.")
@@ -1911,7 +1927,11 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
         if payload.mode.lower() == "append":
             query = f"INSERT INTO {target_rel} SELECT * FROM {source_sql}"
         else:
-            query = f"CREATE OR REPLACE TABLE {target_rel} AS SELECT * FROM {source_sql}"
+            if valid_partition_cols:
+                parts_clause = ", ".join(f'"{c}"' for c in valid_partition_cols)
+                query = f"CREATE OR REPLACE TABLE {target_rel} PARTITIONED BY ({parts_clause}) AS SELECT * FROM {source_sql}"
+            else:
+                query = f"CREATE OR REPLACE TABLE {target_rel} AS SELECT * FROM {source_sql}"
 
         conn.sql(query)
         conn.refresh()
@@ -1923,6 +1943,7 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
 
         dt = DeltaTable(dt_path)
         version = dt.version()
+        actual_partitions = list(dt.metadata().partition_columns or []) if hasattr(dt, "metadata") else valid_partition_cols
         row_count = conn.sql(f"SELECT COUNT(*) FROM delta_scan('{dt_path}')").fetchone()[0]
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
@@ -1932,6 +1953,8 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
                 os.remove(temp_path)
         except Exception:
             pass
+
+        part_msg = f" (Partitioned by: {', '.join(actual_partitions)})" if actual_partitions else ""
 
         log_query(
             query_text=query,
@@ -1962,8 +1985,9 @@ async def ingest_create(payload: IngestCommitRequest, request: Request):
             "full_name": target_rel,
             "version": version,
             "rows_ingested": row_count,
+            "partition_columns": actual_partitions,
             "elapsed_ms": elapsed_ms,
-            "message": f"Successfully created Delta table {target_rel} in catalog '{target_catalog}' with {row_count} rows (Version {version})"
+            "message": f"Successfully created Delta table {target_rel} in catalog '{target_catalog}' with {row_count} rows (Version {version}){part_msg}"
         }
     except Exception as e:
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
