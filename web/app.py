@@ -1720,6 +1720,77 @@ def sanitize_identifier(name: str) -> str:
         s = 'table_' + s
     return s
 
+def get_column_name_pattern_score(col_name: str) -> float:
+    """
+    Knowledge base of common filter column patterns.
+    Returns a heuristic score (0-50) based on how likely this column name is to be filtered.
+    Solves the cold-start problem for new tables with no query history.
+    """
+    col_lower = col_name.lower()
+
+    # Tier 1: Temporal columns - MOST commonly filtered (40-50 points)
+    temporal_patterns = {
+        'date': 50, 'time': 50, 'timestamp': 50,
+        'created_at': 48, 'updated_at': 48, 'modified_at': 48,
+        'year': 45, 'month': 45, 'quarter': 45, 'day': 45,
+        'week': 42, 'fiscal_year': 45, 'fiscal_period': 45,
+        'effective_date': 48, 'transaction_date': 48,
+        'order_date': 48, 'ship_date': 46, 'due_date': 46
+    }
+
+    # Tier 2: Geographic - Very commonly filtered (30-40 points)
+    geographic_patterns = {
+        'region': 40, 'country': 40, 'state': 38, 'province': 38,
+        'city': 35, 'location': 38, 'territory': 38, 'zone': 36,
+        'area': 35, 'district': 36, 'market': 38
+    }
+
+    # Tier 3: Status/Category - Commonly filtered (25-35 points)
+    categorical_patterns = {
+        'status': 38, 'state': 36, 'type': 35, 'category': 36,
+        'class': 32, 'tier': 32, 'level': 30, 'grade': 30,
+        'priority': 32, 'severity': 30, 'stage': 32, 'phase': 30
+    }
+
+    # Tier 4: Organizational - Often filtered (20-30 points)
+    organizational_patterns = {
+        'department': 35, 'division': 32, 'team': 30, 'unit': 28,
+        'branch': 30, 'office': 28, 'channel': 32, 'source': 30
+    }
+
+    # Tier 5: Business entities - Moderately filtered (15-25 points)
+    business_patterns = {
+        'product_type': 28, 'product_category': 28, 'brand': 26,
+        'customer_segment': 28, 'customer_type': 28, 'account_type': 26,
+        'user_type': 26, 'subscription_type': 26, 'plan': 25,
+        'currency': 22, 'payment_method': 24, 'shipping_method': 22
+    }
+
+    # Anti-patterns: Never partition on these (negative scores)
+    anti_patterns = {
+        'id': -50, 'uuid': -50, 'guid': -50, 'key': -40,
+        'hash': -45, 'token': -50, 'code': -30, 'number': -35,
+        'email': -45, 'phone': -45, 'ssn': -50, 'name': -40,
+        'description': -45, 'notes': -45, 'comments': -45,
+        'amount': -35, 'price': -35, 'cost': -35, 'value': -35
+    }
+
+    # Check exact matches first
+    all_patterns = {**temporal_patterns, **geographic_patterns, **categorical_patterns,
+                    **organizational_patterns, **business_patterns, **anti_patterns}
+
+    if col_lower in all_patterns:
+        return all_patterns[col_lower]
+
+    # Check partial matches (column contains pattern)
+    for pattern, score in all_patterns.items():
+        if pattern in col_lower:
+            # Reduce score slightly for partial matches (80% of full score)
+            return score * 0.8
+
+    # No pattern match
+    return 0.0
+
 def get_column_query_frequency(table_name: str = None) -> Dict[str, int]:
     """
     Analyzes query history to find which columns are frequently used in WHERE clauses.
@@ -1842,13 +1913,22 @@ def analyze_partition_suitability(df: pd.DataFrame, conn) -> List[Dict[str, Any]
             # MAJOR BONUS: Query pattern analysis - columns frequently used in WHERE clauses
             # This is the BEST indicator of good partition columns
             col_query_freq = query_freq.get(col_lower, 0)
+            pattern_score = get_column_name_pattern_score(str(col))
+
             if col_query_freq > 0:
                 # Normalize frequency to 0-50 point scale
                 normalized_freq = min(50, (col_query_freq / max_freq) * 50)
                 score += normalized_freq
                 query_usage_note = f"Used in {int(col_query_freq)} queries"
             else:
-                query_usage_note = "Not yet queried"
+                # No query history - use pattern library heuristic
+                score += pattern_score
+                if pattern_score > 0:
+                    query_usage_note = f"Not yet queried (pattern match: +{int(pattern_score)} pts)"
+                elif pattern_score < 0:
+                    query_usage_note = f"Not yet queried (anti-pattern: {int(pattern_score)} pts)"
+                else:
+                    query_usage_note = "Not yet queried"
 
             column_scores.append({
                 'name': str(col),
