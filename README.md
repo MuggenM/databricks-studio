@@ -1,10 +1,10 @@
-# Local Databricks Lakehouse & Studio (SQLFrame + DuckDB + duckrun)
+# Data Kiln Works - Local Lakehouse & Studio (SQLFrame + DuckDB + duckrun)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-A lightweight, local Databricks developer environment that provides full Lakehouse and Spark DataFrame developer parity without requiring a JVM or cloud cluster infrastructure.
+A lightweight, local data lakehouse platform that provides full Lakehouse and Spark DataFrame developer parity without requiring a JVM or cloud cluster infrastructure.
 
-Includes **Databricks Local Studio**—a custom Databricks-inspired web workbench with **Data Ingestion ("Add Data" Wizard)**, **Unity Catalog Explorer**, **Monaco SQL Editor**, and **Delta Time-Travel Inspector**.
+Includes **Data Kiln Works**—a powerful data lakehouse web workbench with **Data Ingestion ("Add Data" Wizard)**, **Unity Catalog Explorer**, **Monaco SQL Editor**, and **Delta Time-Travel Inspector**.
 
 ---
 
@@ -12,10 +12,10 @@ Includes **Databricks Local Studio**—a custom Databricks-inspired web workbenc
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│  DATABRICKS LOCAL STUDIO WEB UI (Port 8891)                                      │
+│  DATA KILN WORKS WEB UI (Port 8891)                                              │
 │  - Data Ingestion Wizard (CSV, TSV, Parquet, JSON drag-and-drop across Catalogs) │
 │  - Lakeview Dashboards (KPI tiles, Bar, Line, Pie/Donut charts, Data tables)     │
-│  - Databricks Genie (Conversational Text-to-SQL with LM Studio, Ollama & charts) │
+│  - AI Query Assistant (Conversational Text-to-SQL with LM Studio, Ollama & charts)│
 │  - SQL Warehouses Manager (Compute cluster sizing, vCPU threads & RAM controls)  │
 │  - Query History & Audit Logging (SQLite WAL log with Warehouse & Catalog tags)  │
 │  - Jobs & Pipelines / Local Workflows (DAG engine, Delta compaction & Papermill) │
@@ -54,7 +54,7 @@ Includes **Databricks Local Studio**—a custom Databricks-inspired web workbenc
 
 ### 1. Launch Stack
 ```bash
-cd /home/martin/volumes/databricks-studio
+cd /home/martin/volumes/datakilnworks
 docker compose up -d
 ```
 
@@ -62,8 +62,8 @@ docker compose up -d
 
 | Interface | URL | Credentials / Notes |
 | :--- | :--- | :--- |
-| **Databricks Local Studio** | [http://localhost:8891](http://localhost:8891) | **No password required.** Includes Data Ingestion wizard, Unity Catalog tree, Monaco SQL Workbench, Time Travel, and Compute stats. |
-| **JupyterLab** | [http://localhost:8890](http://localhost:8890) | Token: `databricks` (pre-injected globals: `spark`, `dbutils`, `display()`, `%sql`) |
+| **Data Kiln Works** | [http://localhost:8891](http://localhost:8891) | **No password required.** Includes Data Ingestion wizard, Unity Catalog tree, Monaco SQL Workbench, Time Travel, and Compute stats. |
+| **JupyterLab** | [http://localhost:8890](http://localhost:8890) | Token: `datakilnworks` (pre-injected globals: `spark`, `dbutils`, `display()`, `%sql`) |
 
 ---
 
@@ -103,7 +103,7 @@ docker compose up -d
 * **Interactive Query Inspection**: Modal inspection with full SQL statement, copy-to-clipboard, execution metadata, and one-click "Open in Monaco SQL Editor".
 
 ### 4. 🔄 Jobs & Pipelines (Local Workflows / DLT)
-* **Databricks Workflows / DLT Emulation**: Full DAG orchestration engine running in-process without requiring external workflow tools (no Apache Airflow, Celery, or Redis dependencies).
+* **Workflows & DLT Orchestration**: Full DAG orchestration engine running in-process without requiring external workflow tools (no Apache Airflow, Celery, or Redis dependencies).
 * **Multi-Type Task Pipeline**:
   - **SQL Transformations (`sql`)**: Vectorized DuckDB execution (`CREATE OR REPLACE TABLE ... AS SELECT ...`).
   - **Delta Compaction & Vacuum (`optimize`)**: Native `dt.optimize.compact()` bin-packing and `dt.vacuum()` storage cleanup on Delta tables.
@@ -118,7 +118,7 @@ docker compose up -d
   - Interactive Pipeline Editor with one-click templates (**Medallion ETL**, **Delta Maintenance**, **Papermill Notebook**).
   - Detailed Execution Audit Trail tracking run status (`SUCCESS`, `FAILED`), execution duration, and per-task logs/outputs.
 
-### 5. ✨ Databricks Genie (Conversational Text-to-SQL)
+### 5. ✨ AI Query Assistant (Conversational Text-to-SQL)
 * **Natural Language Exploration**: Chat directly with local Delta Lakehouse tables in conversational plain English.
 * **Automatic Schema Extraction & Value Sampling**: Backend extracts table definitions, column types, nullability, and actual sample rows from Unity Catalog metadata to ground LLM completions in real schema context.
 * **Vectorized DuckDB SQL Generation**: Generates high-efficiency DuckDB-compatible SQL queries with automatic self-correction against syntax or column hallucinations.
@@ -144,7 +144,7 @@ docker compose up -d
 * **Sample Data Preview**: Instant vectorized preview of Delta table rows with zero cold start.
 * **Delta Lake History & Time Travel**: Inspect all immutable ACID transaction commits (`WRITE`, `UPDATE`, `MERGE`), commit timestamps, affected rows, and one-click "Query this Version (Time Travel)".
 
-### 7. ⚡ Databricks SQL Warehouses (Dynamic Compute Sizing & Ray Elastic Pools)
+### 7. ⚡ SQL Warehouses (Dynamic Compute Sizing & Ray Elastic Pools)
 * **Dedicated Compute Endpoints**: Multiple named SQL Warehouses (`Serverless Starter`, `Analytics Pro`, `ETL & Maintenance`, or custom).
 * **Configurable T-Shirt Cluster Sizing**:
   - `2X-Small`: 1 vCPU, 1GB RAM (Light ad-hoc exploration)
@@ -202,7 +202,7 @@ docker compose up -d
 
 ### 11. 📁 Workspace Browser & Native In-Studio Notebook Runner
 * **Native In-Studio Notebook Execution (Zero JupyterLab Overhead)**:
-  - **Direct In-Browser Cell Execution**: Execute any code cell directly inside the Databricks Studio right-pane with the **▶ Run** button or <kbd>Shift+Enter</kbd> / <kbd>Ctrl+Enter</kbd>.
+  - **Direct In-Browser Cell Execution**: Execute any code cell directly inside the Data Kiln Works right-pane with the **▶ Run** button or <kbd>Shift+Enter</kbd> / <kbd>Ctrl+Enter</kbd>.
   - **Persistent Stateful Kernel Sessions**: Built-in `IPython` / `ipykernel` runner maintains live in-memory state across cell executions (variables, DataFrames, and imports persist from cell to cell).
   - **Pre-Loaded Databricks Globals**: Native access to `spark` (SQLFrame session), `conn` (duckrun Delta session), `dbutils`, `display()` (rich DataTables & HTML previews), and `%sql` / `%%sql` magics.
   - **Sequential "▶ Run All"**: Execute all cells in order with a single click, with live execution spinners and cumulative runtime tracking.
@@ -226,10 +226,10 @@ docker compose up -d
   - `Upload`: Upload notebooks or scripts from your desktop directly into any workspace folder.
   - In-place renaming and deletion with confirmation safeguards and path traversal protection.
 * **Seamless JupyterLab Deep-Linking (Optional)**:
-  - For full-featured JupyterLab sessions, 1-click **Open in JupyterLab** opens the exact notebook in JupyterLab with authentication pre-configured (`/lab/tree/notebooks/<path>?token=databricks`).
+  - For full-featured JupyterLab sessions, 1-click **Open in JupyterLab** opens the exact notebook in JupyterLab with authentication pre-configured (`/lab/tree/notebooks/<path>?token=datakilnworks`).
 * **Universal Search (`Ctrl+P`) Deep-Linking**: Selecting any notebook result in Universal Search opens it immediately in the interactive in-studio notebook runner.
 
-### 12. 🎨 Databricks Studio UI/UX & Themes
+### 12. 🎨 Data Kiln Works UI/UX & Themes
 * **Workspace Default Landing & Session Persistence**: Page reloads now land directly on the **Workspace Browser** instead of Catalog Explorer. Active view state is stored in `localStorage` (`dbx_current_view`), ensuring browser refreshes never lose your active tab.
 * **Dark / Light Mode Theme Switcher**: Top navigation header features an instant theme toggle (<i class="ph ph-sun"></i> / <i class="ph ph-moon"></i>) with FOUC prevention, persistent preference storage in `localStorage` (`dbx_theme`), and live Monaco SQL editor theme switching (`vs-dark` vs `vs`).
 
@@ -310,7 +310,7 @@ docker compose up -d
   - Flexible payload formats: Pandas-compatible DataFrame records (`{"dataframe_records": [...]}`), split format (`{"columns": [...], "data": [...]}`), or input vectors (`{"inputs": [...]}`).
   - Serving lifecycle toggle: One-click Start/Pause endpoint controls with live request counters and moving average latency gauges.
 * **Interactive In-Studio Scoring Playground**:
-  - Test inference queries interactively without leaving Databricks Local Studio.
+  - Test inference queries interactively without leaving Data Kiln Works.
   - 1-click test scenario presets (e.g. *High Risk Attrition*, *Low Risk / Retained*, *Imminent Failure*, *Healthy Machine*).
   - Live JSON payload editor with real-time model evaluation cards and raw JSON prediction trees.
   - One-click **Copy cURL Command** for seamless terminal or API integration testing.
@@ -318,13 +318,13 @@ docker compose up -d
 ### 22. ⚡ Ray Distributed Compute Engine & Kubernetes Scaling Strategy
 * **Ray-Native Dynamic Compute Orchestration**:
   - Eliminates privileged Docker socket mounts and static worker containers.
-  - Stateful [`DuckDBWorkerActor`](file:///home/martin/volumes/databricks-studio/web/ray_engine.py#L40-L130) pools mapped per SQL Warehouse with isolated memory caps (`max_memory`), thread allocations (`threads`), and in-memory catalog mounting.
-  - Managed by [`RayClusterManager`](file:///home/martin/volumes/databricks-studio/web/ray_engine.py#L139-L382) singleton with round-robin query dispatch and cluster telemetry tracking.
+  - Stateful [`DuckDBWorkerActor`](file:///home/martin/volumes/datakilnworks/web/ray_engine.py#L40-L130) pools mapped per SQL Warehouse with isolated memory caps (`max_memory`), thread allocations (`threads`), and in-memory catalog mounting.
+  - Managed by [`RayClusterManager`](file:///home/martin/volumes/datakilnworks/web/ray_engine.py#L139-L382) singleton with round-robin query dispatch and cluster telemetry tracking.
 * **Sub-Second Horizontal Scaling on the Fly**:
   - Scale compute workers up, down, or to zero directly from the UI or API (`[-] N w [+]`) in **< 20 milliseconds** without restarting containers or interrupting active sessions.
   - Persistent state synchronization in `warehouse/.metadata/sql_warehouses.json`.
 * **Distributed Map-Reduce / Scatter-Gather over Delta Lake**:
-  - Parallel partition scanning via [`execute_distributed_delta_scan()`](file:///home/martin/volumes/databricks-studio/web/ray_engine.py#L297-L379).
+  - Parallel partition scanning via [`execute_distributed_delta_scan()`](file:///home/martin/volumes/datakilnworks/web/ray_engine.py#L297-L379).
   - Inspects Delta transaction logs (`DeltaTable.file_uris()`), slices Parquet files into balanced chunks, executes vectorized DuckDB scans across workers in parallel, and merges Apache Arrow tables with zero copy (`pyarrow.concat_tables`).
   - Tested execution latency: **6.77 ms** for distributed partition scan.
 * **REST APIs & Studio Dashboard Controls**:
@@ -336,7 +336,7 @@ docker compose up -d
 
 #### 🌐 Kubernetes Cluster Deployment & Sizing Strategy (Generic Guide)
 
-When deploying Databricks Local Studio on a Kubernetes cluster (e.g. **k3s**, **microk8s**, **vanilla Kubernetes**, **EKS**, or **KubeRay**), the resource configuration is **strictly dependent on the physical resources available across your Kubernetes worker nodes**.
+When deploying Data Kiln Works on a Kubernetes cluster (e.g. **k3s**, **microk8s**, **vanilla Kubernetes**, **EKS**, or **KubeRay**), the resource configuration is **strictly dependent on the physical resources available across your Kubernetes worker nodes**.
 
 ##### 1. The Heterogeneous Cluster Reality
 Real-world Kubernetes clusters (especially edge, on-premise, or homelab environments) rarely consist of identical machines. They frequently feature a **heterogeneous mix**:
@@ -366,7 +366,7 @@ By sizing worker pods to the lowest common denominator, **Kubernetes' default sc
 4. **Plasma Object Store Scalability**: Ray pools the Plasma memory of all distributed pods into one unified, shared-memory Arrow object store across the cluster.
 
 ##### 3. Kubernetes Configuration & Manifests
-To deploy Databricks Local Studio with Ray on Kubernetes:
+To deploy Data Kiln Works with Ray on Kubernetes:
 
 * **Environment Variables**:
   - `RAY_ADDRESS`: Set to `ray://<ray-head-service>:10001` when connecting to a remote KubeRay cluster, or omit for single-pod embedded mode (`local://embedded`).
@@ -378,7 +378,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ray-worker-lcd
-  namespace: databricks-studio
+  namespace: datakilnworks
 spec:
   replicas: 6  # Adjust based on total cluster LCD capacity
   selector:
@@ -444,7 +444,7 @@ spec:
 
 ### 25. 🧱 dbt Core Workbench & Interactive CTE Stepper
 * **Native dbt-core Integration**:
-  - Full dbt project management inside Databricks Local Studio (`./dbt_project`).
+  - Full dbt project management inside Data Kiln Works (`./dbt_project`).
   - Compiles and materializes Jinja SQL models to local Delta Lake tables.
 * **Interactive CTE Step Debugger**:
   - Inspect intermediate Common Table Expressions (`WITH cte AS (...)`) step-by-step.

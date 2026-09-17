@@ -4,12 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
     image: localspark-lakehouse-notebook
-    container_name: local-databricks-lakehouse
+    container_name: local-datakilnworks-lakehouse
     ports:
       - "${HOST_PORT:-8890}:8888"
     environment:
       - WAREHOUSE_DIR=/workspace/warehouse
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-databricks}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-datakilnworks}
     volumes:
       - ./notebooks:/workspace/notebooks
       - ./warehouse:/workspace/warehouse
@@ -22,16 +22,16 @@ services:
           memory: 2G
     restart: unless-stopped
 
-  databricks-studio:
+  datakilnworks-studio:
     image: localspark-lakehouse-notebook
-    container_name: local-databricks-studio
+    container_name: local-datakilnworks-studio
     command: ["python", "-m", "uvicorn", "web.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "${STUDIO_PORT:-8891}:8000"
     environment:
       - WAREHOUSE_DIR=/workspace/warehouse
       - JUPYTER_PORT=${HOST_PORT:-8890}
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-databricks}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-datakilnworks}
       - WH_STARTER_ENDPOINT=http://compute-node-01:8001
       - WH_ANALYTICS_ENDPOINT=http://compute-node-02:8002
       - WH_ETL_ENDPOINT=http://compute-node-03:8003

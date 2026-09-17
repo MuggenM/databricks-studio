@@ -25,4 +25,4 @@ COPY config/00_databricks_shim.py /root/.ipython/profile_default/startup/00_data
 
 EXPOSE 8888 8000
 
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--IdentityProvider.token=databricks", "--ServerApp.token=databricks", "--ServerApp.tornado_settings={\"headers\": {\"Content-Security-Policy\": \"frame-ancestors 'self' *\"}}"]
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--IdentityProvider.token=datakilnworks", "--ServerApp.token=datakilnworks", "--ServerApp.tornado_settings={\"headers\": {\"Content-Security-Policy\": \"frame-ancestors 'self' *\"}}"]
