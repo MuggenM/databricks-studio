@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Databricks Local Studio | DuckDB + duckrun</title>
+  <title>Data Kiln Works | DuckDB + duckrun</title>
   <!-- Tailwind CSS -->
   <script src="/static/tailwind.min.js"></script>
   <script>
@@ -813,7 +813,7 @@
     }
   </style>
 </head>
-<body class="h-full flex flex-col font-sans antialiased overflow-hidden" x-data="databricksStudio()" x-init="initApp()" x-cloak>
+<body class="h-full flex flex-col font-sans antialiased overflow-hidden" x-data="dataKilnWorks()" x-init="initApp()" x-cloak>
 
   <!-- Top Header Navigation Bar -->
   <header class="h-12 bg-dbx-sidebar border-b border-dbx-border flex items-center justify-between px-4 select-none shrink-0 z-20">
@@ -824,7 +824,7 @@
         <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
           <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
         </svg>
-        <span class="text-white text-sm font-semibold tracking-wide">databricks <span class="text-xs font-mono text-[#d95338] uppercase ml-1 px-1.5 py-0.5 bg-orange-500/10 rounded border border-orange-500/30">Local Studio</span></span>
+        <span class="text-white text-sm font-semibold tracking-wide">Data Kiln Works</span>
       </div>
 
       <div class="h-4 w-px bg-dbx-border mx-2"></div>
@@ -5985,7 +5985,7 @@
             </div>
             <div>
               <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                <span>Databricks Genie</span>
+                <span>AI Query Assistant</span>
                 <span class="text-[10px] px-1.5 py-0.2 bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-800 dark:text-fuchsia-300 rounded border border-fuchsia-300 dark:border-fuchsia-800/80 font-mono font-semibold">Conversational AI</span>
               </h2>
               <p class="text-[11px] text-slate-500 dark:text-slate-400">Natural language text-to-SQL querying and visual insights across Delta tables</p>
@@ -6081,7 +6081,7 @@
                   <i class="ph ph-sparkle text-3xl"></i>
                 </div>
                 <div class="space-y-2">
-                  <h3 class="text-xl font-bold text-white">Ask Databricks Genie Anything</h3>
+                  <h3 class="text-xl font-bold text-white">Ask AI Query Assistant Anything</h3>
                   <p class="text-xs text-slate-400 leading-relaxed max-w-lg mx-auto">
                     Genie understands your Unity Catalog schemas and generates vectorized DuckDB SQL queries with live data visualizations and explanations.
                   </p>
@@ -11560,7 +11560,7 @@
 
             <div class="col-span-2">
               <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1 uppercase text-[10px]">Sender Name</label>
-              <input type="text" x-model="emailConfig.sender_name" placeholder="Databricks Local Studio" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
+              <input type="text" x-model="emailConfig.sender_name" placeholder="Data Kiln Works" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded-lg px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500">
             </div>
           </div>
 
@@ -12696,7 +12696,7 @@
   </div>
 
   <script>
-    function databricksStudio() {
+    function dataKilnWorks() {
       return {
         currentView: localStorage.getItem('dbx_current_view') || 'workspace',
         activeCatalogTab: 'schema',
@@ -12731,7 +12731,7 @@
         // Platform Settings State
         showSettingsModal: false,
         platformSettings: { 
-          app_name: 'Databricks Local Studio', 
+          app_name: 'Data Kiln Works', 
           allow_public_read: true, 
           session_timeout_hours: 24,
           default_catalog_permission: 'READ',
@@ -12745,7 +12745,7 @@
           use_tls: true,
           sender_email: '',
           sender_password: '',
-          sender_name: 'Databricks Local Studio',
+          sender_name: 'Data Kiln Works',
           enabled: false
         },
         authConfig: {
@@ -12826,8 +12826,8 @@
           description: ''
         },
         brandConfig: {
-          company_name: 'Databricks Local Studio',
-          app_title: 'Databricks Local Studio',
+          company_name: 'Data Kiln Works',
+          app_title: 'Data Kiln Works',
           logo_url: null,
           logo_dark_url: null,
           favicon_url: null,
@@ -12840,7 +12840,7 @@
           sidebar_bg: '#0b111e',
           panel_bg: '#141b2d',
           border_color: '#1e293b',
-          footer_text: 'Powered by Databricks Local Studio',
+          footer_text: 'Powered by Data Kiln Works',
           show_footer: true,
           custom_css: '',
           login_message: 'Welcome back! Sign in to continue.',
@@ -13735,7 +13735,7 @@
           tasks: []
         },
 
-        // Databricks Genie State
+        // AI Query Assistant State
         genieConfig: { providers: [], default_provider: 'ollama', default_model: 'qwen2.5-coder:latest', tables: [] },
         genieChats: [],
         activeGenieChatId: null,
