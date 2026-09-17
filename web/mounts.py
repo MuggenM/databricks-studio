@@ -377,10 +377,13 @@ def attach_mount_to_duckdb(conn, mount: Dict[str, Any]) -> bool:
                     if "_delta_log" in file_path:
                         continue
                     base_name = os.path.basename(file_path).replace(".parquet", "").replace("-", "_").replace(".", "_")
+                    exact_name = os.path.basename(file_path)
                     try:
                         raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".dbo.\"{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
+                        raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".dbo.\"{exact_name}\" AS SELECT * FROM read_parquet('{file_path}');")
                         if bucket:
                             raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".\"{bucket}\".\"{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
+                            raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}\".\"{bucket}\".\"{exact_name}\" AS SELECT * FROM read_parquet('{file_path}');")
                         raw_conn.execute(f"CREATE OR REPLACE VIEW \"{catalog_name}_{base_name}\" AS SELECT * FROM read_parquet('{file_path}');")
                     except Exception:
                         pass

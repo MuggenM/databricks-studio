@@ -1493,7 +1493,7 @@
               <i class="ph ph-database text-sm"></i>
               <span>View in Catalog Explorer</span>
             </button>
-            <button @click="queryTableInEditor(ingestResult?.table_name, ingestResult?.schema_name || 'dbo', ingestResult?.catalog || 'warehouse')" class="flex items-center space-x-1.5 px-4 py-2 text-xs bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded font-semibold transition">
+            <button @click="queryTableInEditor(ingestResult?.table_name, ingestResult?.schema_name || 'dbo', ingestResult?.catalog || 'warehouse', ingestResult?.columns || ingestData?.columns)" class="flex items-center space-x-1.5 px-4 py-2 text-xs bg-dbx-orange hover:bg-dbx-orange/90 text-white rounded font-semibold transition">
               <i class="ph ph-terminal-window text-sm"></i>
               <span>Query in SQL Editor</span>
             </button>
@@ -1626,7 +1626,7 @@
                 </div>
 
                 <div class="flex items-center space-x-2">
-                  <button @click="queryTableInEditor(selectedTable.table_name, selectedTable.schema_name, selectedTable.catalog)" class="flex items-center space-x-1.5 text-xs bg-dbx-orange hover:bg-dbx-orange/90 text-white px-3 py-1.5 rounded font-medium shadow-sm transition">
+                  <button @click="queryTableInEditor(selectedTable.table_name, selectedTable.schema_name, selectedTable.catalog, selectedTable.columns)" class="flex items-center space-x-1.5 text-xs bg-dbx-orange hover:bg-dbx-orange/90 text-white px-3 py-1.5 rounded font-medium shadow-sm transition">
                     <i class="ph ph-play text-sm"></i>
                     <span>Query in SQL Editor</span>
                   </button>
@@ -16744,11 +16744,89 @@
           this.setEditorValue(sql);
         },
 
-        queryTableInEditor(tableName, schemaName = 'dbo', catalog = 'warehouse') {
+        formatSqlIdentifier(name) {
+          if (!name) return '""';
+          const str = String(name).trim();
+          // Check if identifier is simple alphanumeric with underscore, not starting with a digit:
+          const isSimple = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(str);
+          // Standard SQL & DuckDB reserved keywords
+          const upper = str.toUpperCase();
+          const isReserved = [
+            'ALL', 'ALTER', 'AND', 'ANY', 'ARRAY', 'AS', 'ASC', 'AT', 'ATTACH', 'AVG',
+            'BEGIN', 'BETWEEN', 'BIGINT', 'BINARY', 'BLOB', 'BOOLEAN', 'BY',
+            'CALL', 'CASE', 'CAST', 'CHAR', 'CHECK', 'COLLATE', 'COLUMN', 'COMMIT', 'CONSTRAINT', 'COUNT', 'CREATE', 'CROSS', 'CURRENT', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP', 'CURRENT_USER',
+            'DATABASE', 'DATE', 'DAY', 'DECIMAL', 'DEFAULT', 'DELETE', 'DESC', 'DESCRIBE', 'DETACH', 'DISTINCT', 'DOUBLE', 'DROP',
+            'ELSE', 'END', 'ESCAPE', 'EXCEPT', 'EXECUTE', 'EXISTS', 'EXPLAIN', 'FALSE', 'FETCH', 'FILTER', 'FLOAT', 'FOR', 'FOREIGN', 'FROM', 'FULL', 'FUNCTION',
+            'GROUP', 'GROUPING', 'HAVING', 'HOUR', 'IF', 'ILIKE', 'IN', 'INDEX', 'INNER', 'INSERT', 'INT', 'INTEGER', 'INTERSECT', 'INTERVAL', 'INTO', 'IS',
+            'JOIN', 'KEY', 'LEFT', 'LIKE', 'LIMIT', 'LOAD', 'LOCAL', 'MAX', 'MIN', 'MINUTE', 'MONTH',
+            'NATURAL', 'NOT', 'NULL', 'NULLS', 'NUMERIC', 'OFFSET', 'ON', 'OR', 'ORDER', 'OUTER', 'OVER',
+            'PARTITION', 'POSITION', 'PRAGMA', 'PRECEDING', 'PRIMARY',
+            'RANGE', 'RANK', 'RAW', 'READ', 'RECURSIVE', 'REFERENCES', 'REGEXP', 'REPLACE', 'RETURNING', 'RIGHT', 'ROLLBACK', 'ROW', 'ROWS',
+            'SCHEMA', 'SECOND', 'SELECT', 'SET', 'SHOW', 'SOME', 'SUM',
+            'TABLE', 'TABLESAMPLE', 'THEN', 'TIME', 'TIMESTAMP', 'TO', 'TOP', 'TRUE', 'TRUNCATE',
+            'UNION', 'UNIQUE', 'UPDATE', 'USE', 'USER', 'USING',
+            'VALUES', 'VARCHAR', 'VARYING', 'VIEW', 'WHEN', 'WHERE', 'WINDOW', 'WITH', 'YEAR'
+          ].includes(upper);
+
+          if (isSimple && !isReserved) {
+            return str;
+          }
+          // Enclose between double quotes, escaping any inner double quotes
+          return `"${str.replace(/"/g, '""')}"`;
+        },
+
+        async queryTableInEditor(tableName, schemaName = 'dbo', catalog = 'warehouse', columns = null) {
           this.currentView = 'sql';
           const cat = catalog || 'warehouse';
           const sch = schemaName || 'dbo';
-          const query = `SELECT * FROM ${cat}.${sch}.${tableName} LIMIT 50;`;
+
+          // 1. Resolve columns list
+          let colList = [];
+          if (columns && Array.isArray(columns) && columns.length > 0) {
+            colList = columns;
+          } else if (this.selectedTable && this.selectedTable.table_name === tableName && Array.isArray(this.selectedTable.columns) && this.selectedTable.columns.length > 0) {
+            colList = this.selectedTable.columns;
+          } else if (this.autocompleteMetadata && Array.isArray(this.autocompleteMetadata.columns)) {
+            const matched = this.autocompleteMetadata.columns.filter(c => 
+              (c.table_name === tableName || c.table_name === tableName.replace(/\.[^.]+$/, '')) &&
+              (!c.catalog || c.catalog === cat)
+            );
+            if (matched.length > 0) {
+              colList = matched;
+            }
+          }
+
+          // If still empty, fetch table details from API
+          if (colList.length === 0) {
+            try {
+              const catParam = cat ? `?catalog=${encodeURIComponent(cat)}` : '';
+              const res = await fetch(`/api/table/${encodeURIComponent(sch)}/${encodeURIComponent(tableName)}${catParam}`);
+              if (res.ok) {
+                const data = await res.json();
+                if (data.columns && Array.isArray(data.columns) && data.columns.length > 0) {
+                  colList = data.columns;
+                }
+              }
+            } catch (e) {
+              console.warn('Could not fetch columns for queryTableInEditor:', e);
+            }
+          }
+
+          // Format columns clause: each column on its own indented line, quoted if necessary
+          let columnsClause = '*';
+          if (colList && colList.length > 0) {
+            const formattedCols = colList.map(c => {
+              const colName = typeof c === 'string' ? c : (c.name || c.column_name || String(c));
+              return `    ${this.formatSqlIdentifier(colName)}`;
+            });
+            columnsClause = '\n' + formattedCols.join(',\n');
+          }
+
+          const catRef = this.formatSqlIdentifier(cat);
+          const schRef = this.formatSqlIdentifier(sch);
+          const tblRef = this.formatSqlIdentifier(tableName);
+
+          const query = `SELECT ${columnsClause}\nFROM ${catRef}.${schRef}.${tblRef}\nLIMIT 50;`;
           this.$nextTick(() => {
             this.setEditorValue(query);
           });
