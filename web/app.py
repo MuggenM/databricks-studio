@@ -1720,12 +1720,70 @@ def sanitize_identifier(name: str) -> str:
         s = 'table_' + s
     return s
 
+def get_column_query_frequency(table_name: str = None) -> Dict[str, int]:
+    """
+    Analyzes query history to find which columns are frequently used in WHERE clauses.
+    Returns a dict of {column_name: frequency_count}.
+    """
+    from web.audit import get_db_connection as get_audit_conn
+    import re
+
+    column_freq = {}
+    try:
+        with get_audit_conn() as conn:
+            # Get recent successful queries (last 1000)
+            cursor = conn.execute("""
+                SELECT query_text FROM query_history
+                WHERE status = 'SUCCESS'
+                ORDER BY executed_at DESC
+                LIMIT 1000
+            """)
+            queries = [row[0] for row in cursor.fetchall()]
+
+        # Parse WHERE clauses to find filtered columns
+        for query in queries:
+            query_upper = query.upper()
+
+            # Extract WHERE clause (simple regex pattern)
+            where_match = re.search(r'\bWHERE\b(.+?)(?:\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)', query_upper, re.IGNORECASE | re.DOTALL)
+            if where_match:
+                where_clause = where_match.group(1)
+
+                # Find column names in WHERE clause (before =, <, >, IN, LIKE, BETWEEN, etc.)
+                # Pattern: word followed by comparison operator
+                col_patterns = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|<|>|<=|>=|!=|<>|\bIN\b|\bLIKE\b|\bBETWEEN\b|\bIS\b)', where_clause, re.IGNORECASE)
+                for col in col_patterns:
+                    col_clean = col.lower()
+                    # Skip SQL keywords
+                    if col_clean not in ['and', 'or', 'not', 'null', 'true', 'false', 'case', 'when', 'then', 'else', 'end']:
+                        column_freq[col_clean] = column_freq.get(col_clean, 0) + 1
+
+            # Also check GROUP BY (often indicates important categorization columns)
+            group_match = re.search(r'\bGROUP BY\b\s+([a-zA-Z_][a-zA-Z0-9_,\s]*)', query_upper, re.IGNORECASE)
+            if group_match:
+                group_cols = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', group_match.group(1))
+                for col in group_cols:
+                    col_clean = col.lower()
+                    # GROUP BY columns get bonus points (half weight)
+                    column_freq[col_clean] = column_freq.get(col_clean, 0) + 0.5
+
+    except Exception as e:
+        logger.warning(f"Failed to analyze query frequency: {e}")
+
+    return column_freq
+
 def analyze_partition_suitability(df: pd.DataFrame, conn) -> List[Dict[str, Any]]:
     """
-    Analyzes columns to determine partition suitability.
+    Analyzes columns to determine partition suitability based on:
+    1. Data type and cardinality
+    2. Historical query patterns (WHERE clause frequency)
     Returns list of columns with partition_score and partition_rank.
     """
     column_scores = []
+
+    # Get historical query frequency data
+    query_freq = get_column_query_frequency()
+    max_freq = max(query_freq.values()) if query_freq else 1
 
     for col in df.columns:
         try:
@@ -1781,11 +1839,24 @@ def analyze_partition_suitability(df: pd.DataFrame, conn) -> List[Dict[str, Any]
             elif col_lower in ['id', 'uuid', 'guid']:
                 score -= 50  # IDs are typically bad partition keys
 
+            # MAJOR BONUS: Query pattern analysis - columns frequently used in WHERE clauses
+            # This is the BEST indicator of good partition columns
+            col_query_freq = query_freq.get(col_lower, 0)
+            if col_query_freq > 0:
+                # Normalize frequency to 0-50 point scale
+                normalized_freq = min(50, (col_query_freq / max_freq) * 50)
+                score += normalized_freq
+                query_usage_note = f"Used in {int(col_query_freq)} queries"
+            else:
+                query_usage_note = "Not yet queried"
+
             column_scores.append({
                 'name': str(col),
                 'distinct_count': distinct_count,
                 'cardinality_ratio': round(cardinality_ratio, 4),
-                'partition_score': round(score, 2)
+                'partition_score': round(score, 2),
+                'query_frequency': int(col_query_freq),
+                'query_usage': query_usage_note
             })
         except Exception as e:
             logger.warning(f"Failed to analyze column {col}: {e}")
@@ -1851,7 +1922,9 @@ async def ingest_preview(file: UploadFile = File(...)):
                     "partition_score": col_analysis['partition_score'],
                     "partition_rank": col_analysis['partition_rank'],
                     "distinct_count": col_analysis['distinct_count'],
-                    "cardinality_ratio": col_analysis['cardinality_ratio']
+                    "cardinality_ratio": col_analysis['cardinality_ratio'],
+                    "query_frequency": col_analysis.get('query_frequency', 0),
+                    "query_usage": col_analysis.get('query_usage', 'Not analyzed')
                 })
             columns.append(col_info)
 
