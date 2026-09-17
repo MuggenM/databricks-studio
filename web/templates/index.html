@@ -2172,10 +2172,16 @@
               </div>
             </div>
 
+            <!-- Clear Editor Button -->
+            <button @click="clearSqlEditor()" class="px-2 py-0.5 bg-slate-100 hover:bg-red-100 dark:bg-slate-800/80 dark:hover:bg-red-950/50 border border-slate-300 dark:border-dbx-border hover:border-red-400 dark:hover:border-red-800/70 rounded text-[11px] text-slate-700 dark:text-slate-300 hover:text-red-700 dark:hover:text-red-400 flex items-center space-x-1 transition shadow-xs whitespace-nowrap shrink-0" title="Clear SQL editor to empty">
+              <i class="ph ph-eraser text-xs"></i>
+              <span class="font-medium">Clear</span>
+            </button>
+
             <!-- Quick Snippets / Predefined Query Buttons (3xl displays inline, overflow scrolls smoothly) -->
             <div class="hidden 3xl:flex items-center space-x-1.5 pl-2 border-l border-slate-200 dark:border-dbx-border/70 shrink-0">
               <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Templates:</span>
-              <button @click="insertSnippet('SELECT * FROM silver_employees LIMIT 20;')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-dbx-border rounded text-[11px] font-mono text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white transition flex items-center space-x-1 shadow-xs shrink-0" title="Query silver_employees table">
+              <button @click="insertSnippet('SELECT * FROM warehouse.dbo.silver_employees LIMIT 20;')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-dbx-border rounded text-[11px] font-mono text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white transition flex items-center space-x-1 shadow-xs shrink-0" title="Query warehouse.dbo.silver_employees table">
                 <i class="ph ph-table text-xs text-amber-600 dark:text-amber-400"></i>
                 <span>silver_employees</span>
               </button>
@@ -13734,7 +13740,7 @@
           type: 'bar',
           width: 'col-span-2',
           unit: '',
-          query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees GROUP BY department ORDER BY avg_salary DESC',
+          query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM warehouse.dbo.silver_employees GROUP BY department ORDER BY avg_salary DESC',
           x_col: '',
           y_col: '',
           z_col: '',
@@ -16347,12 +16353,20 @@
         setEditorValue(sql) {
           if (window._monacoEditor) {
             window._monacoEditor.setValue(sql);
+            try {
+              localStorage.setItem('dbx_sql_editor_query', sql);
+            } catch (e) {}
             this.$nextTick(() => {
               if (window._monacoEditor) window._monacoEditor.layout();
             });
           } else {
             this.initMonaco(sql);
           }
+        },
+
+        clearSqlEditor() {
+          this.detachActiveSavedQuery();
+          this.setEditorValue('');
         },
 
         initMonaco(initialSql = null) {
@@ -16362,6 +16376,9 @@
           if (window._monacoEditor) {
             if (initialSql !== null) {
               window._monacoEditor.setValue(initialSql);
+              try {
+                localStorage.setItem('dbx_sql_editor_query', initialSql);
+              } catch (e) {}
             }
             this.$nextTick(() => {
               if (window._monacoEditor) window._monacoEditor.layout();
@@ -16369,18 +16386,41 @@
             return;
           }
 
-          const defaultSql = initialSql !== null ? initialSql : 'SELECT \n    department,\n    COUNT(*) AS total_employees,\n    ROUND(AVG(salary), 2) AS avg_salary\nFROM silver_employees\nGROUP BY department\nORDER BY avg_salary DESC;';
+          const canonicalDefaultSql = 'SELECT \n    department,\n    COUNT(*) AS total_employees,\n    ROUND(AVG(salary), 2) AS avg_salary\nFROM warehouse.dbo.silver_employees\nGROUP BY department\nORDER BY avg_salary DESC;';
+
+          let startingSql = canonicalDefaultSql;
+          if (initialSql !== null) {
+            startingSql = initialSql;
+            try {
+              localStorage.setItem('dbx_sql_editor_query', startingSql);
+            } catch (e) {}
+          } else {
+            try {
+              const savedSql = localStorage.getItem('dbx_sql_editor_query') ?? localStorage.getItem('localspark_sql_editor_query');
+              if (savedSql !== null) {
+                // Keep the query that was already there, migrating any legacy unqualified silver_employees reference
+                startingSql = savedSql.replace(/\bFROM\s+silver_employees\b/g, 'FROM warehouse.dbo.silver_employees');
+              } else {
+                localStorage.setItem('dbx_sql_editor_query', startingSql);
+              }
+            } catch (e) {}
+          }
 
           require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
           require(['vs/editor/editor.main'], () => {
             if (window._monacoEditor) {
-              if (initialSql !== null) window._monacoEditor.setValue(initialSql);
+              if (initialSql !== null) {
+                window._monacoEditor.setValue(initialSql);
+                try {
+                  localStorage.setItem('dbx_sql_editor_query', initialSql);
+                } catch (e) {}
+              }
               window._monacoEditor.layout();
               return;
             }
 
             window._monacoEditor = monaco.editor.create(container, {
-              value: defaultSql,
+              value: startingSql,
               language: 'sql',
               theme: this.isDarkMode ? 'vs-dark' : 'vs',
               fontSize: 13,
@@ -16407,6 +16447,10 @@
 
             window._monacoEditor.onDidChangeModelContent(() => {
               this.activeSavedQueryIsDirty = true;
+              try {
+                const currentVal = window._monacoEditor.getValue();
+                localStorage.setItem('dbx_sql_editor_query', currentVal);
+              } catch (e) {}
             });
 
             setTimeout(() => {
@@ -16693,7 +16737,7 @@
 
         newQuery() {
           this.detachActiveSavedQuery();
-          this.setEditorValue('-- Write your SQL query here\nSELECT * FROM dim_customers LIMIT 10;');
+          this.setEditorValue('-- Write your SQL query here\nSELECT * FROM warehouse.dbo.silver_employees LIMIT 10;');
         },
 
         insertSnippet(sql) {
@@ -16702,9 +16746,9 @@
 
         queryTableInEditor(tableName, schemaName = 'dbo', catalog = 'warehouse') {
           this.currentView = 'sql';
-          const query = (catalog && catalog !== 'warehouse')
-            ? `SELECT * FROM ${catalog}.${schemaName}.${tableName} LIMIT 50;`
-            : `SELECT * FROM ${tableName} LIMIT 50;`;
+          const cat = catalog || 'warehouse';
+          const sch = schemaName || 'dbo';
+          const query = `SELECT * FROM ${cat}.${sch}.${tableName} LIMIT 50;`;
           this.$nextTick(() => {
             this.setEditorValue(query);
           });
@@ -17031,7 +17075,7 @@
             id: '',
             name: '',
             description: '',
-            query_text: window._monacoEditor ? window._monacoEditor.getValue() : 'SELECT * FROM silver_employees LIMIT 25;',
+            query_text: window._monacoEditor ? window._monacoEditor.getValue() : 'SELECT * FROM warehouse.dbo.silver_employees LIMIT 25;',
             warehouse_id: this.selectedSqlWarehouseId || 'wh_starter',
             catalog: 'warehouse',
             schema_name: 'dbo',
@@ -18406,7 +18450,7 @@
             type: 'bar',
             width: 'col-span-2',
             unit: '',
-            query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees GROUP BY department ORDER BY avg_salary DESC',
+            query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM warehouse.dbo.silver_employees GROUP BY department ORDER BY avg_salary DESC',
             x_col: '',
             y_col: '',
             z_col: '',
@@ -18438,7 +18482,7 @@
               type: 'bar',
               width: 'col-span-2',
               unit: '$',
-              query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM silver_employees GROUP BY department ORDER BY avg_salary DESC',
+              query: 'SELECT department, ROUND(AVG(salary), 2) as avg_salary FROM warehouse.dbo.silver_employees GROUP BY department ORDER BY avg_salary DESC',
               x_col: 'department',
               y_col: 'avg_salary',
               z_col: ''
@@ -18449,7 +18493,7 @@
               type: 'area',
               width: 'col-span-2',
               unit: '$',
-              query: 'SELECT hire_date, ROUND(SUM(salary), 0) as total_comp FROM silver_employees GROUP BY hire_date ORDER BY hire_date',
+              query: 'SELECT hire_date, ROUND(SUM(salary), 0) as total_comp FROM warehouse.dbo.silver_employees GROUP BY hire_date ORDER BY hire_date',
               x_col: 'hire_date',
               y_col: 'total_comp',
               z_col: ''
@@ -18460,7 +18504,7 @@
               type: 'pie',
               width: 'col-span-2',
               unit: '$B',
-              query: 'SELECT sector, ROUND(SUM(market_cap_b), 1) as total_mcap FROM nyse_tickers GROUP BY sector ORDER BY total_mcap DESC',
+              query: 'SELECT sector, ROUND(SUM(market_cap_b), 1) as total_mcap FROM warehouse.dbo.nyse_tickers GROUP BY sector ORDER BY total_mcap DESC',
               x_col: 'sector',
               y_col: 'total_mcap',
               z_col: ''
@@ -18471,7 +18515,7 @@
               type: 'kpi',
               width: 'col-span-1',
               unit: '$',
-              query: 'SELECT SUM(salary) as value FROM silver_employees',
+              query: 'SELECT SUM(salary) as value FROM warehouse.dbo.silver_employees',
               x_col: '',
               y_col: '',
               z_col: ''
@@ -18482,7 +18526,7 @@
               type: 'big_number_trendline',
               width: 'col-span-1',
               unit: '$',
-              query: 'SELECT hire_date, ROUND(AVG(salary), 0) as avg_comp FROM silver_employees GROUP BY hire_date ORDER BY hire_date',
+              query: 'SELECT hire_date, ROUND(AVG(salary), 0) as avg_comp FROM warehouse.dbo.silver_employees GROUP BY hire_date ORDER BY hire_date',
               x_col: 'hire_date',
               y_col: 'avg_comp',
               z_col: ''
@@ -18493,7 +18537,7 @@
               type: 'gauge',
               width: 'col-span-1',
               unit: '%',
-              query: 'SELECT ROUND(AVG(annual_spend) / 1000, 1) as quota_pct FROM dim_customers',
+              query: 'SELECT ROUND(AVG(annual_spend) / 1000, 1) as quota_pct FROM warehouse.dbo.dim_customers',
               x_col: '',
               y_col: 'quota_pct',
               z_col: ''
@@ -18504,7 +18548,7 @@
               type: 'treemap',
               width: 'col-span-2',
               unit: '$B',
-              query: 'SELECT company, ROUND(market_cap_b, 1) as market_cap FROM nyse_tickers ORDER BY market_cap DESC LIMIT 15',
+              query: 'SELECT company, ROUND(market_cap_b, 1) as market_cap FROM warehouse.dbo.nyse_tickers ORDER BY market_cap DESC LIMIT 15',
               x_col: 'company',
               y_col: 'market_cap',
               z_col: ''
@@ -18515,7 +18559,7 @@
               type: 'radar',
               width: 'col-span-2',
               unit: 'k',
-              query: 'SELECT department, ROUND(AVG(salary)/1000, 1) as comp_k FROM silver_employees GROUP BY department',
+              query: 'SELECT department, ROUND(AVG(salary)/1000, 1) as comp_k FROM warehouse.dbo.silver_employees GROUP BY department',
               x_col: 'department',
               y_col: 'comp_k',
               z_col: ''
@@ -18526,7 +18570,7 @@
               type: 'funnel',
               width: 'col-span-2',
               unit: '',
-              query: 'SELECT segment, COUNT(*) as accounts FROM dim_customers GROUP BY segment ORDER BY accounts DESC',
+              query: 'SELECT segment, COUNT(*) as accounts FROM warehouse.dbo.dim_customers GROUP BY segment ORDER BY accounts DESC',
               x_col: 'segment',
               y_col: 'accounts',
               z_col: ''
@@ -18537,7 +18581,7 @@
               type: 'table',
               width: 'col-span-2',
               unit: '',
-              query: 'SELECT full_name, segment, annual_spend, join_date FROM dim_customers ORDER BY annual_spend DESC LIMIT 10',
+              query: 'SELECT full_name, segment, annual_spend, join_date FROM warehouse.dbo.dim_customers ORDER BY annual_spend DESC LIMIT 10',
               x_col: '',
               y_col: '',
               z_col: ''
@@ -18548,7 +18592,7 @@
               type: 'pivot_table',
               width: 'col-span-2',
               unit: '',
-              query: 'SELECT department, rank, COUNT(*) as headcount FROM silver_employees GROUP BY department, rank ORDER BY department, rank',
+              query: 'SELECT department, rank, COUNT(*) as headcount FROM warehouse.dbo.silver_employees GROUP BY department, rank ORDER BY department, rank',
               x_col: 'department',
               y_col: 'headcount',
               z_col: 'rank'
@@ -19666,7 +19710,7 @@
                 type: 'sql',
                 depends_on: [],
                 parameters: {
-                  query: 'SELECT department, count(*) as count FROM silver_employees GROUP BY department'
+                  query: 'SELECT department, count(*) as count FROM warehouse.dbo.silver_employees GROUP BY department'
                 }
               }
             ]

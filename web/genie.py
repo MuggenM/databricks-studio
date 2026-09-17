@@ -463,7 +463,7 @@ def call_heuristic_fallback(user_prompt: str, schema_info: Dict[str, Any]) -> Di
             limit_m = re.search(r"\b(\d+)\b", p)
             limit = int(limit_m.group(1)) if limit_m else 5
             return {
-                "sql": f"SELECT name, department, salary, hire_date, rank FROM silver_employees ORDER BY salary DESC LIMIT {limit};",
+                "sql": f"SELECT name, department, salary, hire_date, rank FROM warehouse.dbo.silver_employees ORDER BY salary DESC LIMIT {limit};",
                 "explanation": f"Retrieves the top {limit} highest paid employees sorted by salary descending.",
                 "suggested_visualization": "bar",
                 "x_axis": "name",
@@ -471,7 +471,7 @@ def call_heuristic_fallback(user_prompt: str, schema_info: Dict[str, Any]) -> Di
             }
         elif any(k in p for k in ["avg", "average", "by department", "department"]):
             return {
-                "sql": "SELECT department, count(*) as employee_count, round(avg(salary), 2) as avg_salary, round(sum(salary), 2) as total_payroll FROM silver_employees GROUP BY department ORDER BY avg_salary DESC;",
+                "sql": "SELECT department, count(*) as employee_count, round(avg(salary), 2) as avg_salary, round(sum(salary), 2) as total_payroll FROM warehouse.dbo.silver_employees GROUP BY department ORDER BY avg_salary DESC;",
                 "explanation": "Calculates the employee headcount, average salary, and total payroll grouped by department.",
                 "suggested_visualization": "bar",
                 "x_axis": "department",
@@ -479,7 +479,7 @@ def call_heuristic_fallback(user_prompt: str, schema_info: Dict[str, Any]) -> Di
             }
         else:
             return {
-                "sql": "SELECT department, count(*) as employee_count FROM silver_employees GROUP BY department ORDER BY employee_count DESC;",
+                "sql": "SELECT department, count(*) as employee_count FROM warehouse.dbo.silver_employees GROUP BY department ORDER BY employee_count DESC;",
                 "explanation": "Groups employees by department to show the distribution of team sizes.",
                 "suggested_visualization": "pie",
                 "x_axis": "department",
@@ -536,7 +536,7 @@ def call_heuristic_fallback(user_prompt: str, schema_info: Dict[str, Any]) -> Di
         }
 
     # Generic Fallback: Pick the first available table
-    target_table = tables[0] if tables else "silver_employees"
+    target_table = tables[0] if tables else "warehouse.dbo.silver_employees"
     return {
         "sql": f"SELECT * FROM {target_table} LIMIT 20;",
         "explanation": f"Displays a 20-row sample from the '{target_table}' table for data exploration.",

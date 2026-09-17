@@ -243,22 +243,22 @@ def call_copilot_heuristic(prompt: str, current_query: Optional[str], schema_inf
             dept_match = re.search(r"in\s+([a-zA-Z]+)", p)
             where_clause = f"WHERE department = '{dept_match.group(1).title()}' " if dept_match and dept_match.group(1).lower() not in ["the", "desc", "asc"] else ""
             return {
-                "sql": f"SELECT name, department, salary, hire_date, rank\nFROM silver_employees\n{where_clause}ORDER BY salary DESC\nLIMIT {limit};",
+                "sql": f"SELECT name, department, salary, hire_date, rank\nFROM warehouse.dbo.silver_employees\n{where_clause}ORDER BY salary DESC\nLIMIT {limit};",
                 "explanation": f"Selects the top {limit} highest paid employees sorted by salary descending.",
-                "tables_used": ["silver_employees"]
+                "tables_used": ["warehouse.dbo.silver_employees"]
             }
         elif any(k in p for k in ["avg", "average", "by department", "breakdown"]):
             having_clause = "HAVING COUNT(*) > 2\n" if any(k in p for k in ["> 2", "more than 2", ">2"]) else ""
             return {
-                "sql": f"SELECT \n    department,\n    COUNT(*) AS total_employees,\n    ROUND(AVG(salary), 2) AS avg_salary,\n    ROUND(SUM(salary), 2) AS total_payroll\nFROM silver_employees\nGROUP BY department\n{having_clause}ORDER BY avg_salary DESC;",
+                "sql": f"SELECT \n    department,\n    COUNT(*) AS total_employees,\n    ROUND(AVG(salary), 2) AS avg_salary,\n    ROUND(SUM(salary), 2) AS total_payroll\nFROM warehouse.dbo.silver_employees\nGROUP BY department\n{having_clause}ORDER BY avg_salary DESC;",
                 "explanation": "Aggregates employee count, average salary, and total payroll per department.",
-                "tables_used": ["silver_employees"]
+                "tables_used": ["warehouse.dbo.silver_employees"]
             }
         else:
             return {
-                "sql": "SELECT name, department, salary, hire_date FROM silver_employees LIMIT 20;",
+                "sql": "SELECT name, department, salary, hire_date FROM warehouse.dbo.silver_employees LIMIT 20;",
                 "explanation": "Lists employees with department and salary details.",
-                "tables_used": ["silver_employees"]
+                "tables_used": ["warehouse.dbo.silver_employees"]
             }
 
     # Pattern 2: Stocks, Market Cap, NYSE, Tickers, Valuation
@@ -303,7 +303,7 @@ def call_copilot_heuristic(prompt: str, current_query: Optional[str], schema_inf
         }
 
     # Fallback to first discovered table
-    first_tbl = "silver_employees"
+    first_tbl = "warehouse.dbo.silver_employees"
     for t in schema_info.get("tables", []):
         if not t["name"].startswith("__"):
             first_tbl = t["table_name"]
