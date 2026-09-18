@@ -28,6 +28,7 @@ from web.auth import (
     delete_user, record_user_login, COOKIE_NAME, get_db_connection, init_auth_db
 )
 from web import auth_frameworks
+from web import onelake
 from web.permissions import (
     can_user_access_catalog, can_user_manage_catalog, can_user_delete_catalog,
     delete_all_catalog_permissions, filter_catalogs_for_user,
@@ -675,6 +676,248 @@ async def create_catalog_schema_endpoint(cat_id: str, payload: Dict[str, Any]):
         return {"success": True, "catalog": cat_id, "schema": schema_name, "path": path}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# ==================== ONELAKE EXTERNAL CATALOGS ====================
+
+class OneLakeMountRequest(BaseModel):
+    workspace: str
+    lakehouse: str
+    tenant_id: str
+    client_id: str
+    client_secret: str
+    catalog_id: Optional[str] = None
+
+@app.post("/api/catalogs/onelake/mount")
+async def mount_onelake_catalog_endpoint(payload: OneLakeMountRequest, request: Request):
+    """Mount OneLake lakehouse as read-only external catalog."""
+    try:
+        current_user = await get_current_user(request)
+    except Exception:
+        current_user = {"role": "admin", "username": "admin", "id": "u_admin_01"}
+
+    # Only admins can mount external catalogs
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can mount external catalogs")
+
+    try:
+        catalog = onelake.mount_onelake_catalog(
+            workspace=payload.workspace,
+            lakehouse=payload.lakehouse,
+            tenant_id=payload.tenant_id,
+            client_id=payload.client_id,
+            client_secret=payload.client_secret,
+            catalog_id=payload.catalog_id
+        )
+
+        # List tables
+        tables = catalog.list_tables()
+
+        return {
+            "success": True,
+            "catalog_id": catalog.catalog_id,
+            "workspace": catalog.workspace,
+            "lakehouse": catalog.lakehouse,
+            "type": "onelake",
+            "read_only": True,
+            "table_count": len(tables),
+            "tables": [
+                {
+                    "name": table,
+                    "catalog": catalog.catalog_id,
+                    "source": "onelake",
+                    "read_only": True
+                }
+                for table in tables
+            ],
+            "message": f"Successfully mounted OneLake catalog '{catalog.catalog_id}' with {len(tables)} tables"
+        }
+
+    except ConnectionError as e:
+        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+    except Exception as e:
+        logger.exception("Failed to mount OneLake catalog")
+        raise HTTPException(status_code=500, detail=f"Failed to mount OneLake catalog: {str(e)}")
+
+@app.get("/api/catalogs/onelake")
+async def list_onelake_catalogs_endpoint():
+    """List all mounted OneLake catalogs."""
+    try:
+        catalogs = onelake.list_onelake_catalogs()
+
+        # Add table lists
+        result = []
+        for cat in catalogs:
+            catalog_obj = onelake.get_onelake_catalog(cat['catalog_id'])
+            if catalog_obj:
+                tables = catalog_obj.list_tables()
+                cat['tables'] = tables
+                cat['table_count'] = len(tables)
+            result.append(cat)
+
+        return {
+            "catalogs": result,
+            "count": len(result)
+        }
+
+    except Exception as e:
+        logger.exception("Failed to list OneLake catalogs")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/catalogs/onelake/{catalog_id}")
+async def get_onelake_catalog_endpoint(catalog_id: str):
+    """Get details of a specific OneLake catalog."""
+    catalog = onelake.get_onelake_catalog(catalog_id)
+
+    if not catalog:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    try:
+        tables = catalog.list_tables()
+
+        return {
+            "catalog_id": catalog.catalog_id,
+            "workspace": catalog.workspace,
+            "lakehouse": catalog.lakehouse,
+            "type": "onelake",
+            "read_only": True,
+            "table_count": len(tables),
+            "tables": tables,
+            "base_url": catalog.base_url
+        }
+
+    except Exception as e:
+        logger.exception(f"Failed to get OneLake catalog {catalog_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/catalogs/onelake/{catalog_id}/tables")
+async def list_onelake_tables_endpoint(catalog_id: str, force_refresh: bool = False):
+    """List tables in OneLake catalog."""
+    catalog = onelake.get_onelake_catalog(catalog_id)
+
+    if not catalog:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    try:
+        tables = catalog.list_tables(force_refresh=force_refresh)
+
+        return {
+            "catalog_id": catalog_id,
+            "tables": [
+                {
+                    "name": table,
+                    "catalog": catalog_id,
+                    "source": "onelake",
+                    "read_only": True
+                }
+                for table in tables
+            ],
+            "count": len(tables)
+        }
+
+    except Exception as e:
+        logger.exception(f"Failed to list tables for OneLake catalog {catalog_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/catalogs/onelake/{catalog_id}/tables/{table_name}")
+async def get_onelake_table_metadata_endpoint(catalog_id: str, table_name: str):
+    """Get metadata for a specific OneLake table."""
+    catalog = onelake.get_onelake_catalog(catalog_id)
+
+    if not catalog:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    try:
+        metadata = catalog.get_table_metadata(table_name)
+        return metadata
+
+    except Exception as e:
+        logger.exception(f"Failed to get metadata for {catalog_id}.{table_name}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class OneLakeQueryRequest(BaseModel):
+    table_name: str
+    sql: Optional[str] = None
+    limit: Optional[int] = 100
+    filters: Optional[List] = None
+
+@app.post("/api/catalogs/onelake/{catalog_id}/query")
+async def query_onelake_table_endpoint(catalog_id: str, payload: OneLakeQueryRequest):
+    """Query OneLake table."""
+    catalog = onelake.get_onelake_catalog(catalog_id)
+
+    if not catalog:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    try:
+        if payload.sql:
+            # Execute custom SQL query
+            df = catalog.query_with_duckdb(payload.sql)
+        else:
+            # Simple table read
+            df = catalog.read_table(
+                table_name=payload.table_name,
+                limit=payload.limit,
+                filters=payload.filters
+            )
+
+        return {
+            "catalog_id": catalog_id,
+            "table": payload.table_name,
+            "rows": len(df),
+            "columns": df.columns.tolist(),
+            "data": df.to_dict(orient='records')
+        }
+
+    except Exception as e:
+        logger.exception(f"Failed to query OneLake table {catalog_id}.{payload.table_name}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/catalogs/onelake/{catalog_id}")
+async def unmount_onelake_catalog_endpoint(catalog_id: str, request: Request):
+    """Unmount OneLake catalog."""
+    try:
+        current_user = await get_current_user(request)
+    except Exception:
+        current_user = {"role": "admin", "username": "admin", "id": "u_admin_01"}
+
+    # Only admins can unmount external catalogs
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can unmount external catalogs")
+
+    success = onelake.unmount_onelake_catalog(catalog_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    return {
+        "success": True,
+        "catalog_id": catalog_id,
+        "message": f"OneLake catalog '{catalog_id}' unmounted successfully"
+    }
+
+@app.post("/api/catalogs/onelake/{catalog_id}/test")
+async def test_onelake_connection_endpoint(catalog_id: str):
+    """Test OneLake catalog connection."""
+    catalog = onelake.get_onelake_catalog(catalog_id)
+
+    if not catalog:
+        raise HTTPException(status_code=404, detail=f"OneLake catalog '{catalog_id}' not found")
+
+    try:
+        success = catalog.test_connection()
+
+        return {
+            "catalog_id": catalog_id,
+            "connected": success,
+            "message": "Connection successful" if success else "Connection failed"
+        }
+
+    except Exception as e:
+        return {
+            "catalog_id": catalog_id,
+            "connected": False,
+            "error": str(e)
+        }
 
 # ==================== SQL WAREHOUSES (COMPUTE) APIS ====================
 
