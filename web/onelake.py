@@ -87,8 +87,8 @@ class OneLakeCatalog:
             filesystem = service_client.get_file_system_client(
                 f"{self.workspace}/{self.lakehouse}"
             )
-            # Try to list Tables directory
-            list(filesystem.get_paths(path="Files/Tables", max_results=1))
+            # Try to list Tables directory (managed tables are directly under Tables/)
+            list(filesystem.get_paths(path="Tables", max_results=1))
             logger.info(f"OneLake connection test successful: {self.catalog_id}")
             return True
         except Exception as e:
@@ -106,15 +106,16 @@ class OneLakeCatalog:
                 f"{self.workspace}/{self.lakehouse}"
             )
 
-            paths = filesystem.get_paths(path="Files/Tables")
+            # Managed tables are directly under Tables/ (not Files/Tables/)
+            paths = filesystem.get_paths(path="Tables")
 
             tables = []
             for path in paths:
                 if path.is_directory and not path.name.startswith('_'):
-                    # Extract table name from path (Files/Tables/table_name)
+                    # Extract table name from path (Tables/table_name)
                     parts = path.name.split('/')
-                    if len(parts) >= 3:
-                        table_name = parts[2]
+                    if len(parts) >= 2:
+                        table_name = parts[1]
                         tables.append(table_name)
 
             # Remove duplicates and sort
@@ -132,7 +133,8 @@ class OneLakeCatalog:
     def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
         """Get metadata for a specific OneLake Delta table."""
         try:
-            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Files/Tables/{table_name}"
+            # Managed tables are under Tables/, not Files/Tables/
+            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
 
             storage_options = {
                 'bearer_token': self.credentials.get_bearer_token(),
@@ -178,7 +180,8 @@ class OneLakeCatalog:
     ) -> pd.DataFrame:
         """Read OneLake Delta table as pandas DataFrame."""
         try:
-            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Files/Tables/{table_name}"
+            # Managed tables are under Tables/, not Files/Tables/
+            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
 
             storage_options = {
                 'bearer_token': self.credentials.get_bearer_token(),
@@ -235,7 +238,8 @@ class OneLakeCatalog:
             # Replace table references with delta_scan
             modified_sql = sql
             for table_name in self.list_tables():
-                table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Files/Tables/{table_name}"
+                # Managed tables are under Tables/, not Files/Tables/
+                table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
                 # Replace table name with delta_scan
                 modified_sql = modified_sql.replace(
                     f"{self.catalog_id}.{table_name}",
