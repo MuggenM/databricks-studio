@@ -22503,6 +22503,7 @@
           const timeoutId = setTimeout(() => controller.abort(), 20000);
           try {
             let res;
+            let mountName = this.mountForm.name.trim();
 
             // Handle OneLake separately - use dedicated endpoint
             if (this.mountFormTab === 'onelake') {
@@ -22549,7 +22550,7 @@
               }
 
               const payload = {
-                name: this.mountForm.name.trim(),
+                name: mountName,
                 type: this.mountFormTab,
                 catalog_name: this.mountForm.catalog_name.trim().toLowerCase(),
                 read_only: this.mountForm.read_only,
@@ -22567,7 +22568,7 @@
             clearTimeout(timeoutId);
 
             if (res.ok) {
-              this.showToast(`Storage mount '${payload.name}' attached successfully`, 'success');
+              this.showToast(`Storage mount '${mountName}' attached successfully`, 'success');
               this.showMountStorageModal = false;
               await this.fetchMounts();
               await this.fetchCatalogs();
