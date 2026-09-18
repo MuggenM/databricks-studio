@@ -10776,6 +10776,10 @@
           <i class="ph ph-file-sql text-sm"></i>
           <span>SQLite DB</span>
         </button>
+        <button @click="mountFormTab = 'onelake'" :class="mountFormTab === 'onelake' ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'" class="pb-2 px-3 text-xs flex items-center space-x-1.5 transition">
+          <i class="ph ph-cloud text-sm"></i>
+          <span>☁️ OneLake (Fabric)</span>
+        </button>
       </div>
 
       <!-- Form Body -->
@@ -10868,6 +10872,49 @@
           <div>
             <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">SQLite Database File Path</label>
             <input type="text" x-model="mountForm.sqlite_path" placeholder="/workspace/warehouse/.metadata/history.db" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+          </div>
+        </div>
+
+        <!-- OneLake Specific Settings -->
+        <div x-show="mountFormTab === 'onelake'" class="space-y-3 p-3 bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 rounded-lg">
+          <div class="flex items-center space-x-2 mb-2 text-blue-700 dark:text-blue-300 text-[11px]">
+            <i class="ph ph-cloud text-lg"></i>
+            <span class="font-bold">Microsoft Fabric OneLake Lakehouse</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Workspace Name</label>
+              <input type="text" x-model="mountForm.onelake_workspace" placeholder="analytics-prod" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Lakehouse Name</label>
+              <input type="text" x-model="mountForm.onelake_lakehouse" placeholder="sales-data" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+            </div>
+          </div>
+          <div class="text-[10px] text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-slate-900/60 p-2 rounded border border-blue-100 dark:border-blue-900/40">
+            <i class="ph ph-info text-blue-500 mr-1"></i>
+            <strong>OneLake URL:</strong> <code class="font-mono">abfss://<span x-text="mountForm.onelake_workspace || 'workspace'"></span>@onelake.dfs.fabric.microsoft.com/<span x-text="mountForm.onelake_lakehouse || 'lakehouse'"></span>/Files/Tables/</code>
+          </div>
+          <div class="pt-2 border-t border-blue-200 dark:border-blue-900/40">
+            <label class="block text-slate-500 dark:text-slate-400 font-bold mb-2 uppercase text-[10px]">☁️ Azure AD Credentials</label>
+            <div class="space-y-2">
+              <div>
+                <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Tenant ID</label>
+                <input type="text" x-model="mountForm.onelake_tenant_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Client ID (Service Principal)</label>
+                <input type="text" x-model="mountForm.onelake_client_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-slate-500 dark:text-slate-400 font-medium mb-1 uppercase text-[10px]">Client Secret</label>
+                <input type="password" x-model="mountForm.onelake_client_secret" placeholder="••••••••••••••••••••" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-dbx-border rounded px-2.5 py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none">
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 px-2 py-1.5 rounded bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-800 text-[10px] text-blue-700 dark:text-blue-300">
+            <i class="ph ph-lock-simple text-sm"></i>
+            <span><strong>Read-Only:</strong> OneLake catalogs are mounted read-only. No writes to production data.</span>
           </div>
         </div>
 
@@ -22350,6 +22397,46 @@
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 16000);
           try {
+            // Handle OneLake test connection
+            if (this.mountFormTab === 'onelake') {
+              // For OneLake, we'll mount temporarily and test
+              const payload = {
+                workspace: this.mountForm.onelake_workspace,
+                lakehouse: this.mountForm.onelake_lakehouse,
+                tenant_id: this.mountForm.onelake_tenant_id,
+                client_id: this.mountForm.onelake_client_id,
+                client_secret: this.mountForm.onelake_client_secret,
+                catalog_id: `test_onelake_${Date.now()}`
+              };
+
+              const res = await fetch('/api/catalogs/onelake/mount', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+
+              const result = await res.json();
+
+              if (res.ok) {
+                // Success - unmount the test catalog
+                await fetch(`/api/catalogs/onelake/${result.catalog_id}`, { method: 'DELETE' });
+                this.mountTestResult = {
+                  success: true,
+                  message: `Connected to OneLake! Found ${result.table_count} Delta tables.`,
+                  tables: result.tables?.slice(0, 10).map(t => t.name) || []
+                };
+              } else {
+                this.mountTestResult = {
+                  success: false,
+                  error: result.detail || 'Failed to connect to OneLake'
+                };
+              }
+              return;
+            }
+
+            // Handle other mount types
             let config = {};
             if (this.mountFormTab === 'postgres') {
               config = {
@@ -22415,46 +22502,68 @@
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 20000);
           try {
-            let config = {};
-            if (this.mountFormTab === 'postgres') {
-              config = {
-                host: this.mountForm.pg_host,
-                port: this.mountForm.pg_port,
-                database: this.mountForm.pg_database,
-                user: this.mountForm.pg_user,
-                password: this.mountForm.pg_password
+            let res;
+
+            // Handle OneLake separately - use dedicated endpoint
+            if (this.mountFormTab === 'onelake') {
+              const payload = {
+                workspace: this.mountForm.onelake_workspace,
+                lakehouse: this.mountForm.onelake_lakehouse,
+                tenant_id: this.mountForm.onelake_tenant_id,
+                client_id: this.mountForm.onelake_client_id,
+                client_secret: this.mountForm.onelake_client_secret,
+                catalog_id: this.mountForm.catalog_name.trim().toLowerCase()
               };
-            } else if (this.mountFormTab === 's3') {
-              config = {
-                bucket: this.mountForm.s3_bucket,
-                endpoint: this.mountForm.s3_endpoint,
-                url_style: this.mountForm.s3_url_style,
-                use_ssl: this.mountForm.s3_use_ssl,
-                region: this.mountForm.s3_region,
-                key_id: this.mountForm.s3_key_id,
-                secret: this.mountForm.s3_secret
+
+              res = await fetch('/api/catalogs/onelake/mount', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
+            } else {
+              // Handle other mount types
+              let config = {};
+              if (this.mountFormTab === 'postgres') {
+                config = {
+                  host: this.mountForm.pg_host,
+                  port: this.mountForm.pg_port,
+                  database: this.mountForm.pg_database,
+                  user: this.mountForm.pg_user,
+                  password: this.mountForm.pg_password
+                };
+              } else if (this.mountFormTab === 's3') {
+                config = {
+                  bucket: this.mountForm.s3_bucket,
+                  endpoint: this.mountForm.s3_endpoint,
+                  url_style: this.mountForm.s3_url_style,
+                  use_ssl: this.mountForm.s3_use_ssl,
+                  region: this.mountForm.s3_region,
+                  key_id: this.mountForm.s3_key_id,
+                  secret: this.mountForm.s3_secret
+                };
+              } else if (this.mountFormTab === 'sqlite') {
+                config = {
+                  path: this.mountForm.sqlite_path
+                };
+              }
+
+              const payload = {
+                name: this.mountForm.name.trim(),
+                type: this.mountFormTab,
+                catalog_name: this.mountForm.catalog_name.trim().toLowerCase(),
+                read_only: this.mountForm.read_only,
+                description: this.mountForm.description,
+                config: config
               };
-            } else if (this.mountFormTab === 'sqlite') {
-              config = {
-                path: this.mountForm.sqlite_path
-              };
+
+              res = await fetch('/api/mounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+              });
             }
-
-            const payload = {
-              name: this.mountForm.name.trim(),
-              type: this.mountFormTab,
-              catalog_name: this.mountForm.catalog_name.trim().toLowerCase(),
-              read_only: this.mountForm.read_only,
-              description: this.mountForm.description,
-              config: config
-            };
-
-            const res = await fetch('/api/mounts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-              signal: controller.signal
-            });
             clearTimeout(timeoutId);
 
             if (res.ok) {
