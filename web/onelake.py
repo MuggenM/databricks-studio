@@ -64,12 +64,14 @@ class OneLakeCatalog:
     ):
         self.catalog_id = catalog_id
         self.workspace = workspace
-        self.lakehouse = lakehouse
+        # Add .Lakehouse suffix if not already present (Fabric OneLake requirement)
+        self.lakehouse = lakehouse if lakehouse.endswith('.Lakehouse') else f"{lakehouse}.Lakehouse"
+        self.lakehouse_display = lakehouse  # Keep original name for display
         self.credentials = credentials
-        self.base_url = f"https://onelake.dfs.fabric.microsoft.com/{workspace}/{lakehouse}"
+        self.base_url = f"https://onelake.dfs.fabric.microsoft.com/{workspace}/{self.lakehouse}"
         self.tables_cache: Optional[List[str]] = None
 
-        logger.info(f"Initialized OneLake catalog: {catalog_id} (workspace={workspace}, lakehouse={lakehouse})")
+        logger.info(f"Initialized OneLake catalog: {catalog_id} (workspace={workspace}, lakehouse={self.lakehouse})")
 
     def _get_service_client(self) -> DataLakeServiceClient:
         """Get Azure Data Lake service client."""
