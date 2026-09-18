@@ -22395,7 +22395,9 @@
           this.isTestingMount = true;
           this.mountTestResult = null;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 16000);
+          // OneLake connections need longer timeout for large lakehouses
+          const timeoutMs = this.mountFormTab === 'onelake' ? 60000 : 16000;
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
           try {
             // Handle OneLake test connection
             if (this.mountFormTab === 'onelake') {
