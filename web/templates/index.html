@@ -5836,7 +5836,7 @@
                       <i class="ph ph-stack text-cyan-400"></i>
                       <span x-text="(job.tasks ? job.tasks.length : 0) + ' tasks'"></span>
                     </span>
-                    <span x-show="job.schedule_cron" class="px-1.5 py-0.5 bg-slate-900 rounded font-mono text-[9px] text-cyan-300 border border-dbx-border" :title="'Cron: ' + job.schedule_cron" x-text="'CRON: ' + job.schedule_cron"></span>
+                    <span x-show="job.schedule_cron" class="px-1.5 py-0.5 bg-slate-900 rounded font-mono text-[9px] text-cyan-300 border border-dbx-border" :title="'Cron: ' + job.schedule_cron + ' (' + describeCron(job.schedule_cron) + ')'" x-text="'CRON: ' + job.schedule_cron"></span>
                     <span x-show="!job.schedule_cron" class="text-slate-500 font-mono text-[9px]">MANUAL</span>
                   </div>
                 </div>
@@ -5875,7 +5875,7 @@
               <!-- Metadata Bar & Tabs -->
               <div class="flex items-center justify-between pt-2 border-t border-dbx-border/60 text-xs">
                 <div class="flex items-center space-x-6 text-slate-400">
-                  <div>Schedule: <span class="text-slate-200 font-mono font-semibold" x-text="selectedJob && selectedJob.schedule_cron ? selectedJob.schedule_cron : 'Manual Only'"></span></div>
+                  <div>Schedule: <span class="text-slate-200 font-mono font-semibold" x-text="selectedJob && selectedJob.schedule_cron ? (selectedJob.schedule_cron + ' (' + describeCron(selectedJob.schedule_cron) + ')') : 'Manual Only'"></span></div>
                   <div>Created: <span class="text-slate-200 font-mono" x-text="selectedJob ? selectedJob.created_at : ''"></span></div>
                 </div>
 
@@ -8714,7 +8714,23 @@
               <label class="text-xs font-semibold text-slate-300">Cron Schedule</label>
               <span class="text-[10px] text-slate-400 font-mono">Leave blank for Manual</span>
             </div>
-            <input type="text" x-model="jobForm.schedule_cron" placeholder="e.g. 0 * * * * (hourly) or blank" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500">
+            <div class="relative flex items-center">
+              <input type="text" x-model="jobForm.schedule_cron" @click="openCronModal('jobForm')" placeholder="e.g. 0 * * * * (hourly) or blank" class="w-full bg-slate-900 border border-dbx-border rounded px-3 py-1.5 pr-20 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer hover:border-cyan-500/60 transition" title="Click to configure schedule with Cron Builder">
+              <button type="button" @click="openCronModal('jobForm')" class="absolute right-1 px-2.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-400 border border-cyan-700/50 rounded text-[11px] font-medium flex items-center space-x-1 transition shadow-sm" title="Open Visual Cron Builder">
+                <i class="ph ph-clock text-xs"></i>
+                <span>Builder</span>
+              </button>
+            </div>
+            <div class="mt-1 flex items-center justify-between text-[11px]">
+              <span class="text-cyan-400 flex items-center space-x-1 font-medium" x-show="jobForm.schedule_cron">
+                <i class="ph ph-check-circle text-xs text-emerald-400"></i>
+                <span x-text="describeCron(jobForm.schedule_cron)"></span>
+              </span>
+              <span class="text-slate-500 italic" x-show="!jobForm.schedule_cron">
+                Manual execution only (click to configure schedule)
+              </span>
+              <button type="button" x-show="jobForm.schedule_cron" @click="jobForm.schedule_cron = ''" class="text-slate-400 hover:text-red-400 text-[10px] underline ml-auto transition">Clear</button>
+            </div>
           </div>
           <div class="flex items-center space-x-3 pt-5">
             <label class="flex items-center space-x-2 cursor-pointer">
@@ -8882,6 +8898,216 @@
           <i class="ph ph-check text-xs"></i>
           <span>Save Pipeline</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CRON SCHEDULE BUILDER & FORMATTER ================= -->
+  <div x-show="showCronModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @keydown.escape.window="showCronModal = false">
+    <div class="bg-white dark:bg-dbx-panel border border-slate-200 dark:border-dbx-border rounded-2xl w-full max-w-4xl shadow-2xl p-5 flex flex-col max-h-[92vh]" @click.outside="showCronModal = false">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-dbx-border pb-3 shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="h-10 w-10 rounded-xl bg-cyan-100 dark:bg-cyan-950/70 border border-cyan-300 dark:border-cyan-800 text-cyan-700 dark:text-cyan-400 flex items-center justify-center shadow-sm">
+            <i class="ph ph-clock text-xl"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">Cron Formatter & Schedule Builder</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800">5-FIELD CRON</span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Configure recurring workflow pipeline triggers with standard minute, hour, day, month, and weekday syntax</p>
+          </div>
+        </div>
+        <button @click="showCronModal = false" class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-base p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
+
+      <!-- Scrollable Modal Body -->
+      <div class="flex-1 overflow-y-auto space-y-3.5 pr-1 py-1">
+        <!-- Quick Presets Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-dbx-border text-xs">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">PRESETS:</span>
+          <button type="button" @click="applyCronPreset('* * * * *')" :class="cronRaw === '* * * * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Every minute</button>
+          <button type="button" @click="applyCronPreset('0 * * * *')" :class="cronRaw === '0 * * * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Every hour</button>
+          <button type="button" @click="applyCronPreset('0 0 * * *')" :class="cronRaw === '0 0 * * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Daily midnight</button>
+          <button type="button" @click="applyCronPreset('0 9 * * *')" :class="cronRaw === '0 9 * * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Daily 9 AM</button>
+          <button type="button" @click="applyCronPreset('0 9 * * 1-5')" :class="cronRaw === '0 9 * * 1-5' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Weekdays 9 AM</button>
+          <button type="button" @click="applyCronPreset('*/15 * * * *')" :class="cronRaw === '*/15 * * * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Every 15 min</button>
+          <button type="button" @click="applyCronPreset('0 0 1 * *')" :class="cronRaw === '0 0 1 * *' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">1st of month</button>
+          <button type="button" @click="applyCronPreset('0 0 * * 0')" :class="cronRaw === '0 0 * * 0' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'" class="px-2.5 py-1 rounded-lg text-xs transition">Weekly Sunday</button>
+        </div>
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <button type="button" @click="clearCronSchedule()" title="Clear to manual schedule" class="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 border border-slate-200 dark:border-slate-700 transition">
+            <i class="ph ph-trash text-sm"></i>
+          </button>
+          <button type="button" @click="copyCronToClipboard()" title="Copy cron expression" class="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium flex items-center space-x-1 transition">
+            <i class="ph ph-copy text-xs"></i>
+            <span>Copy</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Segmented View Tabs: Visual Builder vs Raw Input -->
+      <div class="flex items-center space-x-2">
+        <button type="button" @click="cronTab = 'visual'" :class="cronTab === 'visual' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5">
+          <i class="ph ph-sliders text-xs"></i>
+          <span>Visual Builder</span>
+        </button>
+        <button type="button" @click="cronTab = 'raw'" :class="cronTab === 'raw' ? 'bg-cyan-500 text-white font-bold shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'" class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-1.5">
+          <i class="ph ph-terminal text-xs"></i>
+          <span>Raw Input</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Visual Builder -->
+      <div x-show="cronTab === 'visual'" class="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border space-y-4">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">VISUAL BUILDER</div>
+        <div class="grid grid-cols-5 gap-3">
+          <!-- MINUTE -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">MINUTE</label>
+            <input type="text" x-model="cronParts.minute" @input="onCronPartChange()" class="w-full text-center font-mono text-base font-bold bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg py-2 text-cyan-600 dark:text-cyan-400 focus:outline-none focus:border-cyan-500 shadow-sm">
+            <div class="text-[10px] text-slate-400 font-mono">0–59</div>
+            <div class="flex flex-wrap justify-center gap-1 pt-1">
+              <button type="button" @click="setCronPart('minute', '*')" :class="cronParts.minute === '*' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*</button>
+              <button type="button" @click="setCronPart('minute', '0')" :class="cronParts.minute === '0' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">0</button>
+              <button type="button" @click="setCronPart('minute', '*/15')" :class="cronParts.minute === '*/15' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*/15</button>
+              <button type="button" @click="setCronPart('minute', '30')" :class="cronParts.minute === '30' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">30</button>
+            </div>
+          </div>
+
+          <!-- HOUR -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">HOUR</label>
+            <input type="text" x-model="cronParts.hour" @input="onCronPartChange()" class="w-full text-center font-mono text-base font-bold bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg py-2 text-cyan-600 dark:text-cyan-400 focus:outline-none focus:border-cyan-500 shadow-sm">
+            <div class="text-[10px] text-slate-400 font-mono">0–23</div>
+            <div class="flex flex-wrap justify-center gap-1 pt-1">
+              <button type="button" @click="setCronPart('hour', '*')" :class="cronParts.hour === '*' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*</button>
+              <button type="button" @click="setCronPart('hour', '0')" :class="cronParts.hour === '0' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">0</button>
+              <button type="button" @click="setCronPart('hour', '9')" :class="cronParts.hour === '9' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">9</button>
+              <button type="button" @click="setCronPart('hour', '*/6')" :class="cronParts.hour === '*/6' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*/6</button>
+            </div>
+          </div>
+
+          <!-- DAY (MONTH) -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">DAY (MONTH)</label>
+            <input type="text" x-model="cronParts.dayMonth" @input="onCronPartChange()" class="w-full text-center font-mono text-base font-bold bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg py-2 text-cyan-600 dark:text-cyan-400 focus:outline-none focus:border-cyan-500 shadow-sm">
+            <div class="text-[10px] text-slate-400 font-mono">1–31</div>
+            <div class="flex flex-wrap justify-center gap-1 pt-1">
+              <button type="button" @click="setCronPart('dayMonth', '*')" :class="cronParts.dayMonth === '*' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*</button>
+              <button type="button" @click="setCronPart('dayMonth', '1')" :class="cronParts.dayMonth === '1' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">1</button>
+              <button type="button" @click="setCronPart('dayMonth', '15')" :class="cronParts.dayMonth === '15' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">15</button>
+              <button type="button" @click="setCronPart('dayMonth', '*/2')" :class="cronParts.dayMonth === '*/2' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*/2</button>
+            </div>
+          </div>
+
+          <!-- MONTH -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">MONTH</label>
+            <input type="text" x-model="cronParts.month" @input="onCronPartChange()" class="w-full text-center font-mono text-base font-bold bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg py-2 text-cyan-600 dark:text-cyan-400 focus:outline-none focus:border-cyan-500 shadow-sm">
+            <div class="text-[10px] text-slate-400 font-mono">1–12</div>
+            <div class="flex flex-wrap justify-center gap-1 pt-1">
+              <button type="button" @click="setCronPart('month', '*')" :class="cronParts.month === '*' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*</button>
+              <button type="button" @click="setCronPart('month', '1')" :class="cronParts.month === '1' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">1</button>
+              <button type="button" @click="setCronPart('month', '6')" :class="cronParts.month === '6' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">6</button>
+              <button type="button" @click="setCronPart('month', '*/3')" :class="cronParts.month === '*/3' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*/3</button>
+            </div>
+          </div>
+
+          <!-- DAY (WEEK) -->
+          <div class="space-y-1.5 text-center">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">DAY (WEEK)</label>
+            <input type="text" x-model="cronParts.dayWeek" @input="onCronPartChange()" class="w-full text-center font-mono text-base font-bold bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg py-2 text-cyan-600 dark:text-cyan-400 focus:outline-none focus:border-cyan-500 shadow-sm">
+            <div class="text-[10px] text-slate-400 font-mono">0–7 (0,7=Sun)</div>
+            <div class="flex flex-wrap justify-center gap-1 pt-1">
+              <button type="button" @click="setCronPart('dayWeek', '*')" :class="cronParts.dayWeek === '*' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">*</button>
+              <button type="button" @click="setCronPart('dayWeek', '1')" :class="cronParts.dayWeek === '1' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">1</button>
+              <button type="button" @click="setCronPart('dayWeek', '1-5')" :class="cronParts.dayWeek === '1-5' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">1-5</button>
+              <button type="button" @click="setCronPart('dayWeek', '0,6')" :class="cronParts.dayWeek === '0,6' ? 'bg-cyan-500 text-white font-bold' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'" class="px-1.5 py-0.5 rounded font-mono text-[10px] transition">0,6</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visual Spaced Expression Preview -->
+        <div class="flex items-center justify-center p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-xl font-bold tracking-widest text-slate-900 dark:text-white shadow-inner">
+          <span class="text-cyan-600 dark:text-cyan-400 px-3" x-text="cronParts.minute || '*'"></span>
+          <span class="text-slate-400">·</span>
+          <span class="text-cyan-600 dark:text-cyan-400 px-3" x-text="cronParts.hour || '*'"></span>
+          <span class="text-slate-400">·</span>
+          <span class="text-cyan-600 dark:text-cyan-400 px-3" x-text="cronParts.dayMonth || '*'"></span>
+          <span class="text-slate-400">·</span>
+          <span class="text-cyan-600 dark:text-cyan-400 px-3" x-text="cronParts.month || '*'"></span>
+          <span class="text-slate-400">·</span>
+          <span class="text-cyan-600 dark:text-cyan-400 px-3" x-text="cronParts.dayWeek || '*'"></span>
+        </div>
+      </div>
+
+      <!-- Tab 2: Raw Input -->
+      <div x-show="cronTab === 'raw'" class="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-dbx-border space-y-3">
+        <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Standard 5-Field Cron Expression</label>
+        <div class="relative">
+          <input type="text" x-model="cronRaw" @input="onCronRawChange()" placeholder="e.g. 0 6 * * * (daily 6 AM)" class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3.5 py-2.5 text-sm font-mono text-cyan-600 dark:text-cyan-300 focus:outline-none focus:border-cyan-500 shadow-sm">
+        </div>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+          Syntax: <code>&lt;minute 0-59&gt; &lt;hour 0-23&gt; &lt;day of month 1-31&gt; &lt;month 1-12&gt; &lt;day of week 0-7&gt;</code>
+        </p>
+      </div>
+
+      <!-- Human Readable Section -->
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-dbx-border space-y-1">
+        <div class="flex items-center space-x-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <i class="ph ph-calendar-check text-xs text-cyan-500"></i>
+          <span>HUMAN READABLE</span>
+        </div>
+        <div class="text-base sm:text-lg font-bold text-slate-900 dark:text-white" x-text="cronHumanReadable || 'Manual trigger only (no schedule)'"></div>
+      </div>
+
+      <!-- Next 5 Scheduled Runs Section -->
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-dbx-border space-y-2">
+        <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div class="flex items-center space-x-1.5">
+            <i class="ph ph-clock-countdown text-xs text-cyan-500"></i>
+            <span>NEXT 5 SCHEDULED RUNS</span>
+          </div>
+          <span class="text-slate-500 font-normal">Based on current system time</span>
+        </div>
+        <div class="space-y-1.5">
+          <template x-if="cronNextRuns.length === 0">
+            <div class="p-2 text-xs text-slate-400 italic">No scheduled runs (manual trigger only)</div>
+          </template>
+          <template x-for="(run, idx) in cronNextRuns" :key="idx">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-xs font-mono">
+              <div class="flex items-center space-x-3">
+                <span class="h-5 w-5 rounded-full flex items-center justify-center font-bold text-[10px]" :class="idx === 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'" x-text="idx + 1"></span>
+                <span class="text-slate-800 dark:text-slate-200 font-medium" x-text="run"></span>
+              </div>
+              <template x-if="idx === 0">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">Next</span>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-dbx-border shrink-0">
+        <button type="button" @click="clearCronSchedule(); applyCronToTarget()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 text-xs rounded-lg transition flex items-center space-x-1.5">
+          <i class="ph ph-hand text-xs"></i>
+          <span>Manual Only (No Schedule)</span>
+        </button>
+        <div class="flex items-center space-x-2">
+          <button type="button" @click="showCronModal = false" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-dbx-hover border border-slate-300 dark:border-dbx-border text-slate-700 dark:text-slate-300 text-xs rounded-lg transition">Cancel</button>
+          <button type="button" @click="applyCronToTarget()" class="px-4 py-1.5 bg-dbx-orange hover:bg-dbx-orange/90 text-white text-xs font-semibold rounded-lg shadow flex items-center space-x-1.5 transition">
+            <i class="ph ph-check-circle text-xs"></i>
+            <span>Save & Apply Schedule</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -12766,7 +12992,169 @@
   </div>
 
   <script>
-    function dataKilnWorks() {
+  // ==========================================
+  // CRON UTILITY FUNCTIONS & CALCULATORS
+  // ==========================================
+  function matchCronPart(val, pattern, min, max) {
+    if (!pattern || pattern === '*') return true;
+    const numVal = parseInt(val, 10);
+    if (isNaN(numVal)) return false;
+    const parts = pattern.split(',');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed === '*') return true;
+      if (trimmed.startsWith('*/')) {
+        const step = parseInt(trimmed.slice(2), 10);
+        if (step > 0 && numVal % step === 0) return true;
+      } else if (trimmed.includes('-')) {
+        const [start, end] = trimmed.split('-').map(n => parseInt(n, 10));
+        if (!isNaN(start) && !isNaN(end) && numVal >= start && numVal <= end) return true;
+      } else {
+        const n = parseInt(trimmed, 10);
+        if (!isNaN(n) && n === numVal) return true;
+      }
+    }
+    return false;
+  }
+
+  function matchDayOfWeek(dayOfWeek, pattern) {
+    if (!pattern || pattern === '*') return true;
+    const parts = pattern.split(',');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed === '*') return true;
+      if (trimmed.includes('-')) {
+        const [start, end] = trimmed.split('-').map(n => parseInt(n, 10));
+        if (!isNaN(start) && !isNaN(end) && dayOfWeek >= start && dayOfWeek <= end) return true;
+      } else {
+        const n = parseInt(trimmed, 10);
+        if (!isNaN(n)) {
+          if (n === dayOfWeek) return true;
+          if (n === 7 && dayOfWeek === 0) return true;
+          if (n === 0 && dayOfWeek === 7) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function calculateNextCronRuns(cronExpr, count = 5) {
+    if (!cronExpr || !cronExpr.trim()) return [];
+    const parts = cronExpr.trim().split(/\s+/);
+    if (parts.length < 5) return [];
+    const [minP, hrP, domP, monP, dowP] = parts;
+
+    const runs = [];
+    let cur = new Date(Date.now() + 60000);
+    cur.setSeconds(0, 0);
+
+    let iterations = 0;
+    while (runs.length < count && iterations < 30000) {
+      iterations++;
+      const minute = cur.getMinutes();
+      const hour = cur.getHours();
+      const dom = cur.getDate();
+      const month = cur.getMonth() + 1;
+      const dow = cur.getDay();
+
+      if (matchCronPart(month, monP, 1, 12) &&
+          matchCronPart(dom, domP, 1, 31) &&
+          matchDayOfWeek(dow, dowP) &&
+          matchCronPart(hour, hrP, 0, 23) &&
+          matchCronPart(minute, minP, 0, 59)) {
+        runs.push(new Date(cur));
+      }
+      cur = new Date(cur.getTime() + 60000);
+    }
+    return runs.map(d => {
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
+        ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    });
+  }
+
+  function humanizeCronExpression(expr) {
+    if (!expr || !expr.trim()) return 'Manual trigger only (no schedule)';
+    const parts = expr.trim().split(/\s+/);
+    if (parts.length < 5) return 'Invalid cron expression (requires 5 fields)';
+    const [min, hr, dom, mon, dow] = parts;
+
+    const cleanExpr = expr.trim();
+    if (cleanExpr === '* * * * *') return 'Every minute';
+    if (cleanExpr === '0 * * * *') return 'Every hour, on the hour';
+    if (cleanExpr === '0 0 * * *') return 'Daily at midnight (12:00 AM)';
+    if (cleanExpr === '0 12 * * *') return 'Daily at noon (12:00 PM)';
+    if (cleanExpr === '*/15 * * * *') return 'Every 15 minutes';
+    if (cleanExpr === '*/30 * * * *') return 'Every 30 minutes';
+    if (cleanExpr === '*/5 * * * *') return 'Every 5 minutes';
+    if (cleanExpr === '0 0 1 * *') return 'At 12:00 AM, on day 1 of every month';
+    if (cleanExpr === '0 9 * * 1-5') return 'At 09:00 AM, Monday through Friday';
+    if (cleanExpr === '0 6 * * *') return 'At 06:00 AM every day';
+    if (cleanExpr === '0 2 * * *') return 'At 02:00 AM every day';
+    if (cleanExpr === '0 0 * * 0') return 'At 12:00 AM, only on Sunday';
+
+    function formatTime(hStr, mStr) {
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      if (isNaN(h) || isNaN(m)) return `${hStr}:${mStr}`;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      const mPad = m < 10 ? '0' + m : m;
+      const hPad = h12 < 10 ? '0' + h12 : h12;
+      return `${hPad}:${mPad} ${ampm}`;
+    }
+
+    const daysOfWeek = {
+      '0': 'Sunday', '1': 'Monday', '2': 'Tuesday', '3': 'Wednesday',
+      '4': 'Thursday', '5': 'Friday', '6': 'Saturday', '7': 'Sunday'
+    };
+
+    const isNumeric = (str) => /^\d+$/.test(str);
+
+    if (isNumeric(min) && isNumeric(hr)) {
+      const timeStr = formatTime(hr, min);
+      if (dom === '*' && mon === '*') {
+        if (dow === '*') return `At ${timeStr} every day`;
+        if (dow === '1-5') return `At ${timeStr}, Monday through Friday`;
+        if (dow === '0,6' || dow === '6,0') return `At ${timeStr}, on Saturday and Sunday`;
+        if (daysOfWeek[dow]) return `At ${timeStr}, only on ${daysOfWeek[dow]}`;
+      }
+      if (isNumeric(dom) && mon === '*' && dow === '*') {
+        return `At ${timeStr}, on day ${dom} of every month`;
+      }
+    }
+
+    if (min.startsWith('*/') && hr === '*' && dom === '*' && mon === '*' && dow === '*') {
+      return `Every ${min.slice(2)} minutes`;
+    }
+    if (min === '0' && hr.startsWith('*/') && dom === '*' && mon === '*' && dow === '*') {
+      return `Every ${hr.slice(2)} hours, on the hour`;
+    }
+
+    let desc = '';
+    if (min === '*') desc += 'Every minute';
+    else if (min.startsWith('*/')) desc += `Every ${min.slice(2)} minutes`;
+    else desc += `At minute ${min}`;
+
+    if (hr === '*') {
+      if (!min.startsWith('*/') && min !== '*') desc += ', every hour';
+    } else if (hr.startsWith('*/')) {
+      desc += `, every ${hr.slice(2)} hours`;
+    } else {
+      desc += `, past hour ${hr}`;
+    }
+
+    if (dom !== '*') desc += `, on day ${dom} of month`;
+    if (mon !== '*') desc += `, in month ${mon}`;
+    if (dow !== '*') {
+      if (dow === '1-5') desc += ', Monday through Friday';
+      else if (daysOfWeek[dow]) desc += `, on ${daysOfWeek[dow]}`;
+      else desc += `, on weekday ${dow}`;
+    }
+
+    return desc;
+  }
+
+  function dataKilnWorks() {
       return {
         currentView: localStorage.getItem('dbx_current_view') || 'workspace',
         activeCatalogTab: 'schema',
@@ -13808,6 +14196,21 @@
           enabled: true,
           tasks: []
         },
+
+        // Cron Schedule Builder & Formatter State
+        showCronModal: false,
+        cronModalTarget: 'jobForm',
+        cronTab: 'visual', // 'visual' | 'raw'
+        cronParts: {
+          minute: '0',
+          hour: '6',
+          dayMonth: '*',
+          month: '*',
+          dayWeek: '*'
+        },
+        cronRaw: '0 6 * * *',
+        cronHumanReadable: 'At 06:00 AM every day',
+        cronNextRuns: [],
 
         // AI Query Assistant State
         genieConfig: { providers: [], default_provider: 'ollama', default_model: 'qwen2.5-coder:latest', tables: [] },
@@ -20044,6 +20447,110 @@
           } catch (e) {
             alert('Failed to delete job: ' + e.message);
           }
+        },
+
+        // ==================== CRON SCHEDULE BUILDER METHODS ====================
+        openCronModal(target = 'jobForm') {
+          this.cronModalTarget = target;
+          let currentVal = '';
+          if (target === 'jobForm' && this.jobForm) {
+            currentVal = (this.jobForm.schedule_cron || '').trim();
+          }
+          if (!currentVal) {
+            currentVal = '0 6 * * *';
+          }
+          this.loadCronExpression(currentVal);
+          this.cronTab = 'visual';
+          this.showCronModal = true;
+        },
+
+        loadCronExpression(expr) {
+          const clean = (expr || '').trim();
+          this.cronRaw = clean;
+          const parts = clean.split(/\s+/);
+          if (parts.length >= 5) {
+            this.cronParts = {
+              minute: parts[0] || '*',
+              hour: parts[1] || '*',
+              dayMonth: parts[2] || '*',
+              month: parts[3] || '*',
+              dayWeek: parts[4] || '*'
+            };
+          } else {
+            this.cronParts = { minute: '*', hour: '*', dayMonth: '*', month: '*', dayWeek: '*' };
+          }
+          this.updateCronCalculations();
+        },
+
+        onCronPartChange() {
+          const m = (this.cronParts.minute || '*').trim();
+          const h = (this.cronParts.hour || '*').trim();
+          const dom = (this.cronParts.dayMonth || '*').trim();
+          const mon = (this.cronParts.month || '*').trim();
+          const dow = (this.cronParts.dayWeek || '*').trim();
+          this.cronRaw = `${m} ${h} ${dom} ${mon} ${dow}`;
+          this.updateCronCalculations();
+        },
+
+        onCronRawChange() {
+          const parts = (this.cronRaw || '').trim().split(/\s+/);
+          if (parts.length >= 5) {
+            this.cronParts = {
+              minute: parts[0] || '*',
+              hour: parts[1] || '*',
+              dayMonth: parts[2] || '*',
+              month: parts[3] || '*',
+              dayWeek: parts[4] || '*'
+            };
+          }
+          this.updateCronCalculations();
+        },
+
+        setCronPart(partKey, val) {
+          this.cronParts[partKey] = val;
+          this.onCronPartChange();
+        },
+
+        applyCronPreset(expr) {
+          this.loadCronExpression(expr);
+        },
+
+        clearCronSchedule() {
+          this.cronRaw = '';
+          this.cronParts = { minute: '', hour: '', dayMonth: '', month: '', dayWeek: '' };
+          this.cronHumanReadable = 'Manual trigger only (no schedule)';
+          this.cronNextRuns = [];
+        },
+
+        copyCronToClipboard() {
+          if (!this.cronRaw) return;
+          navigator.clipboard.writeText(this.cronRaw).then(() => {
+            this.showToast('Copied cron expression: ' + this.cronRaw, 'success');
+          }).catch(() => {
+            this.showToast('Copied to clipboard: ' + this.cronRaw, 'success');
+          });
+        },
+
+        applyCronToTarget() {
+          const val = this.cronRaw.trim();
+          if (this.cronModalTarget === 'jobForm') {
+            this.jobForm.schedule_cron = val;
+          }
+          this.showCronModal = false;
+          if (val) {
+            this.showToast(`Cron schedule updated: ${val} (${this.cronHumanReadable})`, 'success');
+          } else {
+            this.showToast('Schedule set to Manual Execution only', 'info');
+          }
+        },
+
+        describeCron(expr) {
+          return humanizeCronExpression(expr);
+        },
+
+        updateCronCalculations() {
+          this.cronHumanReadable = humanizeCronExpression(this.cronRaw);
+          this.cronNextRuns = calculateNextCronRuns(this.cronRaw, 5);
         },
 
         // ==================== DATABRICKS GENIE METHODS ====================
