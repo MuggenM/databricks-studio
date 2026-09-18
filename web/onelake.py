@@ -87,8 +87,8 @@ class OneLakeCatalog:
             filesystem = service_client.get_file_system_client(
                 f"{self.workspace}/{self.lakehouse}"
             )
-            # Try to list Tables directory (managed tables are directly under Tables/)
-            list(filesystem.get_paths(path="Tables", max_results=1))
+            # Try to list Tables/Files directory (OneLake lakehouse structure)
+            list(filesystem.get_paths(path="Tables/Files", max_results=1))
             logger.info(f"OneLake connection test successful: {self.catalog_id}")
             return True
         except Exception as e:
@@ -107,16 +107,22 @@ class OneLakeCatalog:
             )
 
             # Managed tables are directly under Tables/ (not Files/Tables/)
-            paths = filesystem.get_paths(path="Tables")
+            paths = filesystem.get_paths(path="Tables/Files")
 
             tables = []
             for path in paths:
-                if path.is_directory and not path.name.startswith('_'):
-                    # Extract table name from path (Tables/table_name)
+                if path.is_directory and not path.name.startswith('_') and not 'year=' in path.name and not 'month=' in path.name:
+                    # Extract table name from path (Tables/Files/table_name or Tables/Files/category/table_name)
                     parts = path.name.split('/')
-                    if len(parts) >= 2:
-                        table_name = parts[1]
-                        tables.append(table_name)
+                    if len(parts) >= 3:
+                        # Direct child: Tables/Files/table_name
+                        if len(parts) == 3:
+                            table_name = parts[2]
+                            tables.append(table_name)
+                        # One level deep: Tables/Files/API/table_name
+                        elif len(parts) == 4:
+                            table_name = parts[3]
+                            tables.append(table_name)
 
             # Remove duplicates and sort
             tables = sorted(list(set(tables)))
@@ -133,8 +139,8 @@ class OneLakeCatalog:
     def get_table_metadata(self, table_name: str) -> Dict[str, Any]:
         """Get metadata for a specific OneLake Delta table."""
         try:
-            # Managed tables are under Tables/, not Files/Tables/
-            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
+            # OneLake tables are under Tables/Files/ path structure
+            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/Files/{table_name}"
 
             storage_options = {
                 'bearer_token': self.credentials.get_bearer_token(),
@@ -180,8 +186,8 @@ class OneLakeCatalog:
     ) -> pd.DataFrame:
         """Read OneLake Delta table as pandas DataFrame."""
         try:
-            # Managed tables are under Tables/, not Files/Tables/
-            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
+            # OneLake tables are under Tables/Files/ path structure
+            table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/Files/{table_name}"
 
             storage_options = {
                 'bearer_token': self.credentials.get_bearer_token(),
@@ -238,8 +244,8 @@ class OneLakeCatalog:
             # Replace table references with delta_scan
             modified_sql = sql
             for table_name in self.list_tables():
-                # Managed tables are under Tables/, not Files/Tables/
-                table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/{table_name}"
+                # OneLake tables are under Tables/Files/ path structure
+                table_url = f"abfss://{self.workspace}@onelake.dfs.fabric.microsoft.com/{self.lakehouse}/Tables/Files/{table_name}"
                 # Replace table name with delta_scan
                 modified_sql = modified_sql.replace(
                     f"{self.catalog_id}.{table_name}",
